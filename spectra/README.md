@@ -294,7 +294,7 @@ The execution engine replaces standard PyTorch linear layers with custom Triton 
   - Designed for batch size $B = 1$ and sequence length $S = 1$.
   - Loads 4-bit packed integer bytes directly into vector registers (`vreg`).
   - Bit-shifts and masks nibbles in parallel:
-    $$\text{low} = \text{packed} \ \& \ 0x0F, \quad \text{high} = (\text{packed} \gg 4) \ \& \ 0x0F$$
+    `low = packed & 0x0F` and `high = (packed >> 4) & 0x0F`
   - Multiplies by microscales and accumulates into FP32 registers.
   - Requires **0 bytes of dynamic global VRAM scratchpad**.
 
