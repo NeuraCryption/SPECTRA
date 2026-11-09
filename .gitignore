@@ -1,0 +1,20 @@
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+dist/
+build/
+*.so
+.env
+.venv
+venv/
+env/
+chat_sessions/*.json
+.pytest_cache/
+.coverage
+htmlcov/
+*.log
+
+# Large binary weights (users clone them via Hugging Face Git LFS)
+*.trdc
+compressed_models/

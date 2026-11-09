@@ -1,0 +1,1170 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="cream">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SPECTRA // Fast GPU Inference</title>
+  
+  <!-- Google Fonts: Outfit (Display) & Inter (Body) -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  
+  <!-- Tailwind CSS & Icons -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/lucide@latest"></script>
+  
+  <!-- Markdown & Code Highlighting -->
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+
+  <style>
+    /* =========================================================================
+       SPECTRA Interface Theme: Warm Neutral & Matte Dark Aesthetic
+       ========================================================================= */
+    :root[data-theme="cream"] {
+      --bg-main: #F7F6F2;
+      --bg-alt: #EDE8DF;
+      --bg-surface: #FFFFFF;
+      --bg-surface-glass: rgba(247, 246, 242, 0.88);
+      --bg-sidebar: #EDE8DF;
+      --border-color: rgba(26, 26, 26, 0.08);
+      --border-strong: rgba(26, 26, 26, 0.16);
+      --text-primary: #1A1A1A;
+      --text-secondary: #4A4A4A;
+      --text-muted: #8A8580;
+      --accent: #2D2926;
+      --accent-warm: #C4A882;
+      --accent-highlight: #B8956A;
+      --accent-deep: #8B7355;
+      --badge-bg: rgba(196, 168, 130, 0.18);
+      --user-bubble-bg: #2D2926;
+      --user-bubble-text: #FFFFFF;
+      --bot-bubble-bg: #FFFFFF;
+      --bot-bubble-border: rgba(26, 26, 26, 0.08);
+      --shadow-soft: 0 4px 20px rgba(26, 26, 26, 0.05);
+      --shadow-glow: 0 0 30px rgba(196, 168, 130, 0.18);
+      --input-bg: #FFFFFF;
+    }
+
+    :root[data-theme="dark"] {
+      --bg-main: #0B0F17;
+      --bg-alt: #111827;
+      --bg-surface: #141B2D;
+      --bg-surface-glass: rgba(17, 24, 39, 0.88);
+      --bg-sidebar: #0D131F;
+      --border-color: rgba(255, 255, 255, 0.09);
+      --border-strong: rgba(255, 255, 255, 0.18);
+      --text-primary: #F3F4F6;
+      --text-secondary: #9CA3AF;
+      --text-muted: #6B7280;
+      --accent: #D4AF37;
+      --accent-warm: #C4A882;
+      --accent-highlight: #E5C38E;
+      --accent-deep: #B8956A;
+      --badge-bg: rgba(196, 168, 130, 0.15);
+      --user-bubble-bg: #1F2937;
+      --user-bubble-text: #F9FAFB;
+      --bot-bubble-bg: #151D30;
+      --bot-bubble-border: rgba(255, 255, 255, 0.08);
+      --shadow-soft: 0 8px 32px rgba(0, 0, 0, 0.4);
+      --shadow-glow: 0 0 35px rgba(196, 168, 130, 0.12);
+      --input-bg: #131B2E;
+    }
+
+    body {
+      background-color: var(--bg-main);
+      color: var(--text-primary);
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      transition: background-color 0.25s ease, color 0.25s ease;
+    }
+
+    h1, h2, h3, h4, .font-display {
+      font-family: 'Outfit', sans-serif;
+    }
+
+    .font-mono {
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    .glass-surface {
+      background: var(--bg-surface-glass);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid var(--border-color);
+    }
+
+    .neumorphic-card {
+      background: var(--bg-surface);
+      border: 1px solid var(--border-color);
+      box-shadow: var(--shadow-soft);
+    }
+
+    .neumorphic-pill {
+      background: var(--bg-surface);
+      border: 1px solid var(--border-color);
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+    }
+
+    .champagne-gradient {
+      background: linear-gradient(135deg, #C4A882 0%, #B8956A 50%, #8B7355 100%);
+    }
+
+    .champagne-text {
+      background: linear-gradient(135deg, #B8956A 0%, #C4A882 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .warm-badge {
+      background-color: var(--badge-bg);
+      color: var(--accent-deep);
+      border: 1px solid rgba(196, 168, 130, 0.35);
+    }
+
+    /* Markdown Styling */
+    .prose pre {
+      background: #111827;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 12px;
+      padding: 1rem;
+      margin: 0.75rem 0;
+      position: relative;
+    }
+    .prose code {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.825rem;
+    }
+    .prose p {
+      margin-bottom: 0.6rem;
+      line-height: 1.65;
+    }
+    .prose ul, .prose ol {
+      margin-left: 1.25rem;
+      margin-bottom: 0.6rem;
+    }
+
+    /* Keyframe Animations for Modern Interface */
+    @keyframes pulseGlow {
+      0%, 100% { box-shadow: 0 0 15px rgba(196, 168, 130, 0.25); }
+      50% { box-shadow: 0 0 25px rgba(196, 168, 130, 0.55); }
+    }
+    @keyframes shimmer {
+      0% { background-position: -200% 0; }
+      100% { background-position: 200% 0; }
+    }
+    .pulse-glow {
+      animation: pulseGlow 2.5s infinite ease-in-out;
+    }
+    .shimmer-active {
+      background: linear-gradient(90deg, #C4A882 0%, #E5C38E 50%, #C4A882 100%);
+      background-size: 200% 100%;
+      animation: shimmer 2s infinite linear;
+    }
+    .typing-cursor::after {
+      content: '▋';
+      animation: blink 1s infinite;
+      margin-left: 2px;
+      color: var(--accent-highlight);
+    }
+    @keyframes blink {
+      0%, 50% { opacity: 1; }
+      51%, 100% { opacity: 0; }
+    }
+
+    ::-webkit-scrollbar {
+      width: 5px;
+      height: 5px;
+    }
+    ::-webkit-scrollbar-track {
+      background: transparent;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: rgba(138, 133, 128, 0.3);
+      border-radius: 9999px;
+    }
+  </style>
+</head>
+
+<body class="h-screen flex overflow-hidden antialiased select-none">
+
+  <!-- ========================================================================= -->
+  <!-- 1. LEFT SIDEBAR (ChatGPT-Style Sessions & Navigation)                     -->
+  <!-- ========================================================================= -->
+  <aside id="sidebar" class="w-72 flex-shrink-0 flex flex-col border-r transition-all duration-300 z-30" style="background-color: var(--bg-sidebar); border-color: var(--border-color);">
+    
+    <!-- Sidebar Header: Brand & New Chat -->
+    <div class="p-4 border-b flex items-center justify-between" style="border-color: var(--border-color);">
+      <div class="flex items-center space-x-2.5">
+        <div class="w-8 h-8 rounded-xl champagne-gradient flex items-center justify-center shadow-md">
+          <i data-lucide="sparkles" class="w-4 h-4 text-white"></i>
+        </div>
+        <div>
+          <span class="font-display font-extrabold text-base tracking-tight" style="color: var(--text-primary);">SPECTRA</span>
+          <span class="text-[9px] font-mono tracking-widest block uppercase font-semibold text-[#8B7355]">GPU INFERENCE</span>
+        </div>
+      </div>
+      
+      <button onclick="toggleTheme()" title="Toggle Theme" class="p-2 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 transition" style="color: var(--text-secondary);">
+        <i id="theme-icon" data-lucide="moon" class="w-4 h-4"></i>
+      </button>
+    </div>
+
+    <!-- New Chat Button -->
+    <div class="p-3">
+      <button onclick="createNewChat()" class="w-full py-2.5 px-3.5 rounded-xl flex items-center justify-between text-xs font-semibold shadow-sm transition hover:scale-[1.01] active:scale-[0.99]" style="background-color: var(--bg-surface); border: 1px solid var(--border-color); color: var(--text-primary);">
+        <span class="flex items-center space-x-2">
+          <i data-lucide="plus-circle" class="w-4 h-4 text-[#B8956A]"></i>
+          <span>New Chat</span>
+        </span>
+        <span class="text-[10px] font-mono px-1.5 py-0.5 rounded warm-badge">Ctrl+K</span>
+      </button>
+    </div>
+
+    <!-- Models & Compression Quick Link -->
+    <div class="px-3 pb-2">
+      <button onclick="openModelsModal()" class="w-full py-2 px-3 rounded-xl flex items-center justify-between text-xs font-medium transition hover:bg-black/5 dark:hover:bg-white/5" style="color: var(--text-secondary);">
+        <span class="flex items-center space-x-2">
+          <i data-lucide="layers" class="w-4 h-4 text-[#8B7355]"></i>
+          <span>AI Models & Compression</span>
+        </span>
+        <i data-lucide="chevron-right" class="w-3.5 h-3.5"></i>
+      </button>
+    </div>
+
+    <!-- Sessions List (Stored on Local Hard Drive) -->
+    <div class="flex-1 overflow-y-auto px-3 py-2 space-y-1" id="session-history-list">
+      <div class="text-[11px] font-semibold uppercase tracking-wider px-2 py-1 text-slate-400">Past Conversations</div>
+      <div class="text-xs p-3 text-center text-slate-400 font-mono">Loading saved chats...</div>
+    </div>
+
+    <!-- Live Telemetry Card at Bottom of Sidebar -->
+    <div class="p-3.5 border-t space-y-2" style="border-color: var(--border-color); background-color: var(--bg-main);">
+      <div class="flex items-center justify-between text-[11px] font-mono font-bold">
+        <span class="flex items-center space-x-1.5" style="color: var(--text-secondary);">
+          <i data-lucide="cpu" class="w-3.5 h-3.5 text-[#B8956A]"></i>
+          <span id="side-device-name" class="truncate max-w-[130px]">Hardware</span>
+        </span>
+        <span id="side-temp-badge" class="px-1.5 py-0.5 rounded text-[10px] bg-amber-500/10 text-amber-600 font-bold">--°C</span>
+      </div>
+
+      <!-- GPU Memory Bar -->
+      <div class="space-y-1" title="Memory usage directly matching nvidia-smi">
+        <div class="flex justify-between text-[10px] font-mono" style="color: var(--text-muted);">
+          <span>RAM</span>
+          <span id="side-vram-text">0 / 0 MB</span>
+        </div>
+        <div class="w-full h-1.5 bg-black/10 dark:bg-white/10 rounded-full overflow-hidden">
+          <div id="side-vram-bar" class="h-full champagne-gradient transition-all duration-300 w-0"></div>
+        </div>
+        <div id="side-vram-sub" class="text-[9px] font-mono text-slate-400 flex justify-between">
+          <span>Active: -- MB</span>
+          <span>Reserved: -- MB</span>
+        </div>
+      </div>
+      
+      <!-- Context Telemetry Tag -->
+      <div class="pt-1 space-y-0.5 font-mono">
+        <div class="flex items-center justify-between text-[10px]" style="color: var(--text-muted);">
+          <span>Context Capacity:</span>
+          <span id="side-safe-tokens" class="font-bold text-[#B8956A]">4,096 tokens</span>
+        </div>
+        <div id="side-context-tier" class="text-[9px] text-slate-400">
+          VRAM Tier: -- &bull; Smart Host: Active
+        </div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- ========================================================================= -->
+  <!-- 2. MAIN CHAT CONTAINER                                                    -->
+  <!-- ========================================================================= -->
+  <main class="flex-1 flex flex-col h-full overflow-hidden relative">
+
+    <!-- Top Navigation Header -->
+    <header class="h-16 flex-shrink-0 px-6 border-b glass-surface flex items-center justify-between z-20" style="border-color: var(--border-color);">
+      
+      <!-- Left: Model Selector & Context Pill -->
+      <div class="flex items-center space-x-3">
+        <!-- Sidebar Toggle on Mobile -->
+        <button onclick="toggleSidebar()" class="lg:hidden p-2 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 transition">
+          <i data-lucide="menu" class="w-5 h-5"></i>
+        </button>
+
+        <!-- Model Picker Pill -->
+        <div class="flex items-center space-x-2 px-3.5 py-1.5 rounded-full neumorphic-pill cursor-pointer hover:border-[#C4A882] transition" onclick="openModelsModal()">
+          <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+          <span id="header-model-name" class="text-xs font-semibold truncate max-w-[200px]" style="color: var(--text-primary);">Select a Model</span>
+          <i data-lucide="chevron-down" class="w-3.5 h-3.5" style="color: var(--text-muted);"></i>
+        </div>
+
+        <!-- User-Defined Context Window Pill & Modal Trigger -->
+        <div class="flex items-center space-x-1.5 px-3 py-1.5 rounded-full neumorphic-pill text-xs font-mono" title="Click to change custom context window">
+          <i data-lucide="maximize-2" class="w-3.5 h-3.5 text-[#B8956A]"></i>
+          <span style="color: var(--text-muted);">Context:</span>
+          <input type="number" id="header-context-input" value="4096" min="512" max="131072" step="512"
+                 onchange="updateUserContextWindow(this.value)"
+                 class="w-16 bg-transparent font-bold text-center focus:outline-none border-b border-[#C4A882]" style="color: var(--text-primary);">
+          <span style="color: var(--text-muted);">tokens</span>
+        </div>
+      </div>
+
+      <!-- Right: Hardware Status & Unload Model Button -->
+      <div class="flex items-center space-x-3">
+        <!-- Live GPU status badge -->
+        <div class="hidden sm:flex items-center space-x-2 text-xs font-mono px-3 py-1.5 rounded-full warm-badge">
+          <i data-lucide="shield-check" class="w-3.5 h-3.5 text-[#8B7355]"></i>
+          <span id="header-vram-tag">GPU: 0 MB</span>
+        </div>
+
+        <!-- Unload Model Button -->
+        <button id="btn-deload" onclick="deloadActiveModel()" class="hidden px-3.5 py-1.5 rounded-full text-xs font-semibold bg-rose-500/10 hover:bg-rose-500/20 text-rose-600 border border-rose-500/30 flex items-center space-x-1.5 transition">
+          <i data-lucide="eject" class="w-3.5 h-3.5"></i>
+          <span>Unload Model</span>
+        </button>
+      </div>
+    </header>
+
+    <!-- Chat Messages Stream Area -->
+    <div id="chat-messages-container" class="flex-1 min-h-0 overflow-y-auto px-4 md:px-8 py-6 space-y-6">
+      
+      <!-- Welcome Hero (Shown when conversation is empty) -->
+      <div id="welcome-hero" class="h-full min-h-[400px] flex flex-col items-center justify-center text-center max-w-2xl mx-auto space-y-6 select-text">
+        <div class="w-16 h-16 rounded-3xl champagne-gradient flex items-center justify-center shadow-xl shadow-[#C4A882]/20">
+          <i data-lucide="zap" class="w-8 h-8 text-white"></i>
+        </div>
+        
+        <div class="space-y-2">
+          <h2 class="text-3xl font-display font-extrabold tracking-tight" style="color: var(--text-primary);">
+            High-Speed <span class="champagne-text">GPU Inference.</span>
+          </h2>
+          <p class="text-sm max-w-lg mx-auto" style="color: var(--text-secondary);">
+            Quantized 4-bit transformer execution with hardware register fusion.
+          </p>
+        </div>
+
+        <!-- Quick Starter Chips -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 w-full max-w-lg text-left pt-4">
+          <button onclick="usePromptPreset('Solve 5x - 20 = 45 step-by-step with explanation.')" class="p-3.5 rounded-2xl neumorphic-card hover:border-[#C4A882] transition group">
+            <span class="text-xs font-bold block mb-1" style="color: var(--text-primary);">Reasoning Math</span>
+            <span class="text-xs truncate block" style="color: var(--text-muted);">Solve 5x - 20 = 45 step-by-step.</span>
+          </button>
+          <button onclick="usePromptPreset('Write a Python class for thread-safe asynchronous producer-consumer.')" class="p-3.5 rounded-2xl neumorphic-card hover:border-[#C4A882] transition group">
+            <span class="text-xs font-bold block mb-1" style="color: var(--text-primary);">Python Systems</span>
+            <span class="text-xs truncate block" style="color: var(--text-muted);">Thread-safe async producer-consumer.</span>
+          </button>
+          <button onclick="usePromptPreset('Explain why GPU cache and registers provide faster access than main memory.')" class="p-3.5 rounded-2xl neumorphic-card hover:border-[#C4A882] transition group">
+            <span class="text-xs font-bold block mb-1" style="color: var(--text-primary);">Hardware Architecture</span>
+            <span class="text-xs truncate block" style="color: var(--text-muted);">Registers vs main memory speed.</span>
+          </button>
+          <button onclick="usePromptPreset('What are the key trade-offs between dense transformers and MoE models?')" class="p-3.5 rounded-2xl neumorphic-card hover:border-[#C4A882] transition group">
+            <span class="text-xs font-bold block mb-1" style="color: var(--text-primary);">AI Research</span>
+            <span class="text-xs truncate block" style="color: var(--text-muted);">Dense vs Mixture of Experts trade-offs.</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Messages Thread Element -->
+      <div id="messages-list" class="max-w-3xl mx-auto space-y-6 pb-6 hidden select-text"></div>
+    </div>
+
+    <!-- Dedicated Bottom Input Dock (Normal Flex Sibling: Completely Separated from Messages) -->
+    <div class="flex-shrink-0 px-4 md:px-6 py-3.5 border-t glass-surface z-20" style="border-color: var(--border-color); background-color: var(--bg-main);">
+      <div class="max-w-3xl mx-auto">
+        
+        <!-- Input Box Surface -->
+        <div class="neumorphic-card rounded-2xl p-3 border transition-all duration-200 focus-within:border-[#C4A882] focus-within:shadow-lg" style="background-color: var(--input-bg);">
+          
+          <!-- Textarea -->
+          <textarea id="prompt-input" rows="2" placeholder="Message SPECTRA or ask a question..."
+                    onkeydown="handleKeydown(event)"
+                    oninput="handleInputResize(this)"
+                    class="w-full bg-transparent resize-none p-1.5 text-sm focus:outline-none max-h-36" style="color: var(--text-primary);"></textarea>
+
+          <!-- Input Footer: Context Options & Action Buttons -->
+          <div class="flex items-center justify-between pt-2 border-t mt-1" style="border-color: var(--border-color);">
+            
+            <!-- Context Window Presets Chips -->
+            <div class="flex items-center space-x-1 text-[11px] font-mono overflow-x-auto py-0.5">
+              <span class="text-slate-400 hidden sm:inline mr-0.5">Context:</span>
+              <button onclick="setContextPreset(2048)" data-val="2048" class="ctx-chip px-2 py-0.5 rounded-lg border text-slate-500 hover:text-black dark:hover:text-white transition">2K</button>
+              <button onclick="setContextPreset(4096)" data-val="4096" class="ctx-chip px-2 py-0.5 rounded-lg border warm-badge font-bold transition">4K</button>
+              <button onclick="setContextPreset(8192)" data-val="8192" class="ctx-chip px-2 py-0.5 rounded-lg border text-slate-500 hover:text-black dark:hover:text-white transition">8K</button>
+              <button onclick="setContextPreset(16384)" data-val="16384" class="ctx-chip px-2 py-0.5 rounded-lg border text-slate-500 hover:text-black dark:hover:text-white transition">16K</button>
+              <button onclick="setContextPreset(32768)" data-val="32768" class="ctx-chip px-2 py-0.5 rounded-lg border text-slate-500 hover:text-black dark:hover:text-white transition">32K</button>
+              <button onclick="setContextPreset(65536)" data-val="65536" class="ctx-chip px-2 py-0.5 rounded-lg border text-slate-500 hover:text-black dark:hover:text-white transition">64K</button>
+              <button onclick="setContextPreset(131072)" data-val="131072" class="ctx-chip px-2 py-0.5 rounded-lg border text-slate-500 hover:text-black dark:hover:text-white transition">128K</button>
+            </div>
+
+            <!-- Action Buttons: Stop Generation & Send -->
+            <div class="flex items-center space-x-2">
+              
+              <!-- Force Stop Button (shown only when generating) -->
+              <button id="btn-force-stop" onclick="forceStopGeneration()" class="hidden px-3.5 py-1.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs uppercase tracking-wider flex items-center space-x-1.5 shadow-md shadow-rose-600/25 transition">
+                <i data-lucide="square" class="w-3.5 h-3.5 fill-current"></i>
+                <span>Stop</span>
+              </button>
+
+              <!-- Send Button -->
+              <button id="btn-send" onclick="sendPrompt()" class="px-4 py-2 rounded-xl champagne-gradient hover:opacity-95 text-white font-bold text-xs uppercase tracking-wider flex items-center space-x-1.5 shadow-md shadow-[#C4A882]/25 transition">
+                <span>Send</span>
+                <i data-lucide="arrow-up" class="w-4 h-4"></i>
+              </button>
+            </div>
+
+          </div>
+
+        </div>
+
+        <div class="text-[10px] text-center pt-2 font-mono" style="color: var(--text-muted);">
+          SPECTRA &bull; Private High-Throughput GPU Inference
+        </div>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- ========================================================================= -->
+  <!-- 3. MODELS & 1-CLICK COMPRESSION MODAL                                     -->
+  <!-- ========================================================================= -->
+  <div id="modal-models" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+    <div class="w-full max-w-4xl max-h-[90vh] rounded-3xl neumorphic-card overflow-hidden flex flex-col" style="background-color: var(--bg-surface);">
+      
+      <!-- Modal Header -->
+      <div class="p-6 border-b flex items-center justify-between" style="border-color: var(--border-color);">
+        <div>
+          <h3 class="font-display font-extrabold text-xl" style="color: var(--text-primary);">AI Models & Compression</h3>
+          <p class="text-xs" style="color: var(--text-muted);">Choose an original model to compress, or launch a compressed model to chat.</p>
+        </div>
+        <button onclick="closeModelsModal()" class="p-2 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 transition">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <!-- Compression Active Progress Bar -->
+      <div id="modal-compression-progress" class="hidden p-4 border-b bg-[#C4A882]/10 border-[#C4A882]/30">
+        <div class="flex items-center justify-between text-xs font-mono font-bold mb-2">
+          <span class="flex items-center space-x-2 text-[#8B7355]">
+            <i data-lucide="loader" class="w-4 h-4 animate-spin"></i>
+            <span id="mcomp-model-name">Compressing...</span>
+          </span>
+          <span id="mcomp-pct">0%</span>
+        </div>
+        <div class="w-full h-2.5 bg-black/10 rounded-full overflow-hidden">
+          <div id="mcomp-bar" class="h-full champagne-gradient transition-all duration-300 w-0"></div>
+        </div>
+        <div class="flex justify-between text-[10px] font-mono mt-2" style="color: var(--text-muted);">
+          <span id="mcomp-tensor" class="truncate max-w-[400px]">Compressing model layers...</span>
+          <span id="mcomp-ratio" class="text-emerald-600 font-bold">Target: ~2.8x Smaller</span>
+        </div>
+      </div>
+
+      <!-- Modal Body Tabs -->
+      <div class="flex-1 overflow-y-auto p-6 space-y-6">
+        
+        <!-- Section: Discovered Raw Models -->
+        <div>
+          <div class="flex items-center justify-between mb-3">
+            <h4 class="font-display font-bold text-sm uppercase tracking-wider" style="color: var(--text-secondary);">
+              Original Models (Ready to Compress)
+            </h4>
+            <button onclick="refreshModelsList()" class="text-xs font-mono font-semibold text-[#B8956A] hover:underline flex items-center space-x-1">
+              <i data-lucide="refresh-cw" class="w-3 h-3"></i>
+              <span>Rescan</span>
+            </button>
+          </div>
+          
+          <div id="modal-raw-models-grid" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div class="text-xs font-mono text-center p-4 text-slate-400">Scanning repo for models...</div>
+          </div>
+        </div>
+
+        <!-- Section: Compressed Containers Ready for Inference -->
+        <div>
+          <h4 class="font-display font-bold text-sm uppercase tracking-wider mb-3" style="color: var(--text-secondary);">
+            Compressed Models (Ready to Chat)
+          </h4>
+          <div id="modal-compressed-models-grid" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div class="text-xs font-mono text-center p-4 text-slate-400">Scanning compressed models...</div>
+          </div>
+        </div>
+
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ========================================================================= -->
+  <!-- 4. JAVASCRIPT LOGIC & API CLIENT                                          -->
+  <!-- ========================================================================= -->
+  <script>
+    let activeSessionId = null;
+    let activeModelPath = null;
+    let isGenerating = false;
+    let activeAbortController = null;
+    let currentUserContextWindow = 4096;
+
+    function handleInputResize(el) {
+      if (!el) return;
+      el.style.height = 'auto';
+      el.style.height = Math.min(el.scrollHeight, 140) + 'px';
+    }
+
+    // Initialize Markdown parser
+    marked.setOptions({
+      highlight: function(code, lang) {
+        const language = hljs.getLanguage(lang) ? lang : 'plaintext';
+        return hljs.highlight(code, { language }).value;
+      },
+      breaks: true
+    });
+
+    // Theme Toggle (Warm Cream <-> Dark Theme)
+    function toggleTheme() {
+      const root = document.documentElement;
+      const current = root.getAttribute('data-theme') || 'cream';
+      const target = current === 'cream' ? 'dark' : 'cream';
+      root.setAttribute('data-theme', target);
+      document.getElementById('theme-icon').setAttribute('data-lucide', target === 'cream' ? 'moon' : 'sun');
+      lucide.createIcons();
+    }
+
+    function toggleSidebar() {
+      const s = document.getElementById('sidebar');
+      s.classList.toggle('hidden');
+    }
+
+    // Update User Context Window
+    function updateUserContextWindow(val) {
+      val = parseInt(val) || 4096;
+      currentUserContextWindow = val;
+      const inp = document.getElementById('header-context-input');
+      if (inp) inp.value = val;
+      
+      // Update quick chips style
+      document.querySelectorAll('.ctx-chip').forEach(c => {
+        const chipVal = parseInt(c.getAttribute('data-val')) || (parseInt(c.innerText.replace('K','')) * 1024);
+        if (chipVal === val) {
+          c.className = 'ctx-chip px-2 py-0.5 rounded-lg border warm-badge font-bold transition shadow-sm';
+        } else {
+          c.className = 'ctx-chip px-2 py-0.5 rounded-lg border text-slate-500 hover:text-black dark:hover:text-white transition';
+        }
+      });
+
+      // Update sidebar context capacity display immediately
+      const sideSafeTokens = document.getElementById('side-safe-tokens');
+      if (sideSafeTokens) {
+        sideSafeTokens.innerText = `${val.toLocaleString()} tokens`;
+      }
+
+      // Sync with active session
+      if (activeSessionId) {
+        fetch(`/api/chat/sessions/${activeSessionId}/context`, {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({ context_window: val })
+        }).catch(() => {});
+      }
+    }
+
+    function setContextPreset(val) {
+      updateUserContextWindow(val);
+    }
+
+    // Telemetry Poller (1Hz)
+    async function updateTelemetry() {
+      try {
+        const res = await fetch('/api/telemetry');
+        const data = await res.json();
+
+        // Sidebar
+        document.getElementById('side-device-name').innerText = data.device_name || 'CPU Host';
+        document.getElementById('side-vram-text').innerText = `${data.allocated_vram_mb || 0} / ${data.total_vram_mb || 0} MB`;
+        document.getElementById('side-vram-bar').style.width = `${Math.min(100, data.vram_percent || 0)}%`;
+        document.getElementById('side-temp-badge').innerText = data.gpu_temp_c ? `${data.gpu_temp_c}°C` : '--°C';
+        
+        const sideSub = document.getElementById('side-vram-sub');
+        if (sideSub) {
+          sideSub.innerHTML = `<span>Active: ${data.pytorch_allocated_mb || 0} MB</span><span>Reserved: ${data.reserved_vram_mb || 0} MB</span>`;
+        }
+
+        // Active context capacity display
+        const sideSafe = document.getElementById('side-safe-tokens');
+        if (sideSafe) {
+          sideSafe.innerText = `${(currentUserContextWindow || 4096).toLocaleString()} tokens`;
+        }
+        const sideTier = document.getElementById('side-context-tier');
+        if (sideTier) {
+          const vramTok = data.max_safe_gpu_tokens ? data.max_safe_gpu_tokens.toLocaleString() : '--';
+          sideTier.innerText = `VRAM Tier: ${vramTok} tok • Smart Host: Extended`;
+        }
+
+        // Header
+        if (data.loaded_model) {
+          activeModelPath = data.loaded_model;
+          document.getElementById('header-model-name').innerText = data.loaded_model;
+          document.getElementById('header-vram-tag').innerText = `GPU: ${data.allocated_vram_mb} MB (${data.vram_percent}%)`;
+          document.getElementById('btn-deload').classList.remove('hidden');
+        } else {
+          activeModelPath = null;
+          document.getElementById('header-model-name').innerText = 'Select a Model';
+          document.getElementById('header-vram-tag').innerText = `GPU: ${data.allocated_vram_mb || 0} MB (${data.vram_percent || 0}%)`;
+          document.getElementById('btn-deload').classList.add('hidden');
+        }
+      } catch (err) {
+        console.error('Telemetry err:', err);
+      }
+    }
+
+    setInterval(updateTelemetry, 1000);
+    updateTelemetry();
+
+    // =========================================================================
+    // LOCAL HARD-DRIVE SESSIONS MANAGEMENT
+    // =========================================================================
+
+    async function loadSessionsList() {
+      try {
+        const res = await fetch('/api/chat/sessions');
+        const list = await res.json();
+        const container = document.getElementById('session-history-list');
+
+        if (!list || list.length === 0) {
+          container.innerHTML = `
+            <div class="text-[11px] font-semibold uppercase tracking-wider px-2 py-1 text-slate-400">Past Conversations</div>
+            <div class="text-xs p-3 text-center text-slate-400 font-mono">No saved chats yet.</div>
+          `;
+          return;
+        }
+
+        container.innerHTML = `
+          <div class="text-[11px] font-semibold uppercase tracking-wider px-2 py-1 text-slate-400">Past Conversations</div>
+          ${list.map(s => `
+            <div data-session-id="${s.id}" onclick="switchSession('${s.id}')" class="group flex items-center justify-between p-2.5 rounded-xl cursor-pointer transition text-xs ${s.id === activeSessionId ? 'warm-badge font-bold' : 'hover:bg-black/5 dark:hover:bg-white/5'}">
+              <div class="flex items-center space-x-2 truncate">
+                <i data-lucide="message-square" class="w-3.5 h-3.5 flex-shrink-0 text-[#B8956A]"></i>
+                <span class="truncate">${escapeHtml(s.title || 'Conversation')}</span>
+              </div>
+              <button onclick="event.stopPropagation(); deleteSession('${s.id}')" class="opacity-0 group-hover:opacity-100 p-1 hover:text-rose-500 transition" title="Delete conversation">
+                <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+              </button>
+            </div>
+          `).join('')}
+        `;
+        lucide.createIcons();
+      } catch (e) {
+        console.error('Failed to load sessions:', e);
+      }
+    }
+
+    function createNewChat() {
+      activeSessionId = null;
+      renderSessionMessages([]);
+      // Clear active highlight on past conversation items
+      document.querySelectorAll('#session-history-list [data-session-id]').forEach(el => {
+        el.classList.remove('warm-badge', 'font-bold');
+        el.classList.add('hover:bg-black/5', 'dark:hover:bg-white/5');
+      });
+      const inputEl = document.getElementById('prompt-input');
+      if (inputEl) {
+        inputEl.value = '';
+        inputEl.style.height = 'auto';
+        inputEl.focus();
+      }
+    }
+
+    async function switchSession(sessionId) {
+      activeSessionId = sessionId;
+      try {
+        const res = await fetch(`/api/chat/sessions/${sessionId}`);
+        const data = await res.json();
+        if (data.context_window) {
+          updateUserContextWindow(data.context_window);
+        }
+        renderSessionMessages(data.messages || []);
+        await loadSessionsList();
+      } catch (e) {
+        console.error('Error loading session:', e);
+      }
+    }
+
+    async function deleteSession(sessionId) {
+      if (!confirm('Delete this conversation history from hard drive?')) return;
+      try {
+        await fetch(`/api/chat/sessions/${sessionId}`, { method: 'DELETE' });
+        const res = await fetch('/api/chat/sessions');
+        const list = await res.json();
+        if (activeSessionId === sessionId) {
+          if (list && list.length > 0) {
+            await switchSession(list[0].id);
+          } else {
+            createNewChat();
+          }
+        }
+        await loadSessionsList();
+      } catch (e) {
+        console.error('Delete failed:', e);
+      }
+    }
+
+    function renderSessionMessages(messages) {
+      const hero = document.getElementById('welcome-hero');
+      const container = document.getElementById('messages-list');
+
+      if (!messages || messages.length === 0) {
+        hero.classList.remove('hidden');
+        container.classList.add('hidden');
+        container.innerHTML = '';
+        return;
+      }
+
+      hero.classList.add('hidden');
+      container.classList.remove('hidden');
+
+      container.innerHTML = messages.map(m => {
+        if (m.role === 'user') {
+          return `
+            <div class="flex justify-end">
+              <div class="max-w-[80%] rounded-2xl px-4 py-3 text-sm shadow-sm" style="background-color: var(--user-bubble-bg); color: var(--user-bubble-text);">
+                ${escapeHtml(m.content)}
+              </div>
+            </div>
+          `;
+        } else {
+          return `
+            <div class="flex space-x-3">
+              <div class="w-8 h-8 rounded-xl champagne-gradient flex-shrink-0 flex items-center justify-center text-white shadow-sm">
+                <i data-lucide="sparkles" class="w-4 h-4"></i>
+              </div>
+              <div class="flex-1 neumorphic-card rounded-2xl p-4 text-sm prose max-w-none" style="background-color: var(--bot-bubble-bg);">
+                <div>${formatResponseText(m.content || '')}</div>
+                ${m.tok_per_sec ? `
+                  <div class="mt-3 pt-2 border-t flex items-center justify-between text-[10px] font-mono text-slate-400" style="border-color: var(--border-color);">
+                    <span>Speed: <strong class="text-emerald-600">${m.tok_per_sec} tokens/sec</strong> (${m.tokens || 0} tokens)</span>
+                    ${m.stopped ? '<span class="text-rose-500 font-bold">[Stopped by User]</span>' : ''}
+                  </div>
+                ` : ''}
+              </div>
+            </div>
+          `;
+        }
+      }).join('');
+
+      lucide.createIcons();
+      scrollChatToBottom();
+    }
+
+    function scrollChatToBottom() {
+      const c = document.getElementById('chat-messages-container');
+      c.scrollTop = c.scrollHeight;
+    }
+
+    function escapeHtml(text) {
+      const div = document.createElement('div');
+      div.innerText = text;
+      return div.innerHTML;
+    }
+
+    function formatResponseText(text) {
+      if (!text) return '';
+      let cleaned = text.replace(/<｜.*?｜>/g, '')
+                        .replace(/<\|.*?\|>/g, '')
+                        .replace(/\[\s*<\s*\|\s*end__of__sentence\s*\|\s*>\s*\]/g, '')
+                        .replace(/<\s*\|\s*end__of__sentence\s*\|\s*>/g, '');
+
+      if (cleaned.includes('</think>') && !cleaned.includes('<think>')) {
+        cleaned = '<think>' + cleaned;
+      }
+
+      if (cleaned.includes('<think>')) {
+        if (cleaned.includes('</think>')) {
+          cleaned = cleaned.replace(/<think>([\s\S]*?)<\/think>/g, (m, p1) => {
+            return `<details class="mb-3 rounded-2xl p-3 bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 text-xs font-mono" open>
+                      <summary class="cursor-pointer font-bold select-none text-[#8B7355] hover:opacity-80 flex items-center space-x-1.5">
+                        <span>Thought Process</span>
+                      </summary>
+                      <div class="mt-2 text-slate-600 dark:text-slate-300 whitespace-pre-wrap">${escapeHtml(p1.trim())}</div>
+                    </details>`;
+          });
+        } else {
+          const parts = cleaned.split('<think>');
+          cleaned = `${parts[0]}<div class="mb-3 rounded-2xl p-3 bg-[#C4A882]/10 border border-[#C4A882]/20 text-xs font-mono text-[#8B7355]">
+                       <div class="font-bold flex items-center space-x-1.5"><i data-lucide="loader" class="w-3.5 h-3.5 animate-spin"></i><span>Thinking...</span></div>
+                       <div class="mt-1 text-slate-600 dark:text-slate-300 whitespace-pre-wrap">${escapeHtml(parts[1] || '')}</div>
+                     </div>`;
+        }
+      }
+      return marked.parse(cleaned);
+    }
+
+    function usePromptPreset(text) {
+      document.getElementById('prompt-input').value = text;
+      sendPrompt();
+    }
+
+    function handleKeydown(e) {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        sendPrompt();
+      }
+    }
+
+    // =========================================================================
+    // STREAMING INFERENCE WITH USER-DEFINED CONTEXT & FORCE STOP
+    // =========================================================================
+
+    async function sendPrompt() {
+      if (isGenerating) return;
+      const inputEl = document.getElementById('prompt-input');
+      const prompt = inputEl.value.trim();
+      if (!prompt) return;
+
+      if (!activeModelPath) {
+        alert('Please load a model first using the "AI Models & Compression" button.');
+        openModelsModal();
+        return;
+      }
+
+      // Lazily create session on disk ONLY when the user prompts!
+      if (!activeSessionId) {
+        try {
+          const sessRes = await fetch('/api/chat/sessions', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+              title: prompt.slice(0, 36).trim() + (prompt.length > 36 ? '...' : ''),
+              context_window: currentUserContextWindow
+            })
+          });
+          if (sessRes.ok) {
+            const newSess = await sessRes.json();
+            activeSessionId = newSess.id;
+          }
+        } catch (e) {
+          console.warn('Session creation error:', e);
+        }
+      }
+
+      inputEl.value = '';
+      inputEl.style.height = 'auto';
+      isGenerating = true;
+
+      // Show Stop Button, Hide Send
+      document.getElementById('btn-send').classList.add('hidden');
+      document.getElementById('btn-force-stop').classList.remove('hidden');
+
+      // Append user bubble to UI
+      const hero = document.getElementById('welcome-hero');
+      const container = document.getElementById('messages-list');
+      hero.classList.add('hidden');
+      container.classList.remove('hidden');
+
+      container.innerHTML += `
+        <div class="flex justify-end">
+          <div class="max-w-[80%] rounded-2xl px-4 py-3 text-sm shadow-sm" style="background-color: var(--user-bubble-bg); color: var(--user-bubble-text);">
+            ${escapeHtml(prompt)}
+          </div>
+        </div>
+      `;
+
+      // Create Assistant placeholder bubble
+      const botMsgId = `bot-msg-${Date.now()}`;
+      container.innerHTML += `
+        <div class="flex space-x-3" id="${botMsgId}">
+          <div class="w-8 h-8 rounded-xl champagne-gradient flex-shrink-0 flex items-center justify-center text-white shadow-sm">
+            <i data-lucide="sparkles" class="w-4 h-4"></i>
+          </div>
+          <div class="flex-1 neumorphic-card rounded-2xl p-4 text-sm prose max-w-none" style="background-color: var(--bot-bubble-bg);">
+            <div class="bot-text"><span class="inline-block animate-pulse text-[#C4A882]">Thinking...</span></div>
+            <div class="bot-meta hidden mt-3 pt-2 border-t flex items-center justify-between text-[10px] font-mono text-slate-400" style="border-color: var(--border-color);"></div>
+          </div>
+        </div>
+      `;
+      lucide.createIcons();
+      scrollChatToBottom();
+
+      let fullResponseText = '';
+      let botTextEl = document.querySelector(`#${botMsgId} .bot-text`);
+      let botMetaEl = document.querySelector(`#${botMsgId} .bot-meta`);
+
+      activeAbortController = new AbortController();
+
+      try {
+        const response = await fetch('/api/engine/generate', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          signal: activeAbortController.signal,
+          body: JSON.stringify({
+            prompt: prompt,
+            max_new_tokens: Math.max(1024, currentUserContextWindow - Math.ceil(prompt.length / 3)),
+            temperature: 0.2,
+            top_p: 0.95,
+            repetition_penalty: 1.1,
+            context_window: currentUserContextWindow,
+            session_id: activeSessionId,
+            preserve_context: true
+          })
+        });
+
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let sseBuffer = '';
+
+        while (true) {
+          const { value, done } = await reader.read();
+          if (done) break;
+
+          sseBuffer += decoder.decode(value, { stream: true });
+          const lines = sseBuffer.split('\n');
+          sseBuffer = lines.pop(); // Keep partial trailing line in buffer
+
+          for (const line of lines) {
+            const trimmed = line.trim();
+            if (trimmed.startsWith('data: ')) {
+              try {
+                const data = JSON.parse(trimmed.substring(6));
+                if (data.token) {
+                  fullResponseText += data.token;
+                  botTextEl.innerHTML = formatResponseText(fullResponseText);
+                  scrollChatToBottom();
+                }
+                if (data.error) {
+                  botTextEl.innerHTML += `<div class="text-rose-500 font-bold mt-2">${escapeHtml(data.error)}</div>`;
+                  scrollChatToBottom();
+                }
+                if (data.done) {
+                  botMetaEl.classList.remove('hidden');
+                  botMetaEl.innerHTML = `
+                    <span>Speed: <strong class="text-emerald-600">${data.final_decode_tok_per_sec || 0} tokens/sec</strong> (${data.generated_count || 0} tokens)</span>
+                    <span class="text-[#8B7355] font-semibold">${data.context_state === 'PARKED_IN_HOST_RAM' ? 'Cached in Memory' : 'Active'}</span>
+                    ${data.stopped ? '<span class="text-rose-500 font-bold">[Stopped]</span>' : ''}
+                  `;
+                }
+              } catch (e) {}
+            }
+          }
+        }
+
+      } catch (err) {
+        if (err.name !== 'AbortError') {
+          botTextEl.innerHTML += `<div class="text-rose-500 font-bold mt-2">Error during generation: ${err}</div>`;
+        }
+      } finally {
+        isGenerating = false;
+        activeAbortController = null;
+        document.getElementById('btn-send').classList.remove('hidden');
+        document.getElementById('btn-force-stop').classList.add('hidden');
+        await loadSessionsList();
+      }
+    }
+
+    // Force Stop Generation
+    async function forceStopGeneration() {
+      try {
+        await fetch('/api/engine/stop', { method: 'POST' });
+        if (activeAbortController) {
+          activeAbortController.abort();
+        }
+      } catch (e) {
+        console.error('Stop error:', e);
+      }
+    }
+
+    // De-load / Unload Model
+    async function deloadActiveModel() {
+      if (!confirm('Unload model and release GPU memory to 0 MB?')) return;
+      try {
+        await fetch('/api/engine/unload', { method: 'POST' });
+        await updateTelemetry();
+        alert('Model successfully unloaded. GPU memory released to 0 MB.');
+      } catch (e) {
+        alert('Failed to unload: ' + e);
+      }
+    }
+
+    // =========================================================================
+    // MODELS MODAL & 1-CLICK COMPRESSION
+    // =========================================================================
+
+    function openModelsModal() {
+      document.getElementById('modal-models').classList.remove('hidden');
+      refreshModelsList();
+    }
+
+    function closeModelsModal() {
+      document.getElementById('modal-models').classList.add('hidden');
+    }
+
+    async function refreshModelsList() {
+      try {
+        const res = await fetch('/api/models');
+        const data = await res.json();
+
+        // Raw models
+        const rawEl = document.getElementById('modal-raw-models-grid');
+        if (data.raw_models.length === 0) {
+          rawEl.innerHTML = '<div class="col-span-2 text-center text-xs p-6 text-slate-400 font-mono">No original models detected in repository root. Place any model folder (e.g. DeepSeek, Nemotron, Granite) here to compress.</div>';
+        } else {
+          rawEl.innerHTML = data.raw_models.map(m => `
+            <div class="neumorphic-card rounded-2xl p-4 flex flex-col justify-between space-y-3">
+              <div>
+                <div class="flex items-center justify-between mb-1">
+                  <span class="text-[10px] font-mono px-2 py-0.5 rounded-full warm-badge">${m.type}</span>
+                  <span class="text-xs font-mono font-bold" style="color: var(--text-muted);">${m.size_gb} GB</span>
+                </div>
+                <h5 class="font-display font-bold text-sm" style="color: var(--text-primary);">${m.name}</h5>
+                <p class="text-xs font-mono text-slate-400 mt-1">${m.architecture}</p>
+                <div class="text-[11px] font-mono text-slate-400 mt-2">Context: ${(m.max_context || 32768).toLocaleString()} tokens &bull; ${m.num_layers || 28} Layers</div>
+              </div>
+              <div class="pt-3 border-t flex items-center justify-between" style="border-color: var(--border-color);">
+                <span class="text-[10px] font-mono ${m.has_compressed ? 'text-emerald-600 font-semibold' : 'text-slate-400'}">
+                  ${m.has_compressed ? '✓ Compressed & Ready' : '○ Ready to Compress'}
+                </span>
+                <button onclick="triggerOneClickCompression('${m.path}')" class="px-3.5 py-1.5 rounded-xl champagne-gradient hover:opacity-90 text-white font-bold text-xs uppercase tracking-wider transition shadow-sm">
+                  Compress Model
+                </button>
+              </div>
+            </div>
+          `).join('');
+        }
+
+        // Compressed models
+        const compEl = document.getElementById('modal-compressed-models-grid');
+        if (data.compressed_models.length === 0) {
+          compEl.innerHTML = '<div class="col-span-2 text-center text-xs p-6 text-slate-400 font-mono">No compressed models yet. Click "Compress Model" on any original model above to start.</div>';
+        } else {
+          compEl.innerHTML = data.compressed_models.map(c => `
+            <div class="neumorphic-card rounded-2xl p-4 flex flex-col justify-between space-y-3 ${c.is_loaded ? 'border-[#C4A882] shadow-md ring-1 ring-[#C4A882]/50' : ''}">
+              <div>
+                <div class="flex items-center justify-between mb-1">
+                  <span class="text-[10px] font-mono px-2 py-0.5 rounded-full ${c.is_loaded ? 'bg-emerald-500/10 text-emerald-600 font-bold' : 'warm-badge'}">
+                    ${c.is_loaded ? '● CURRENTLY LOADED' : 'READY TO RUN'}
+                  </span>
+                  <span class="text-xs font-mono font-bold text-emerald-600">${c.vram_savings_pct}% Memory Saved</span>
+                </div>
+                <h5 class="font-display font-bold text-sm truncate" style="color: var(--text-primary);" title="${c.display_name || c.name}">${c.display_name || c.name}</h5>
+                <div class="text-xs font-mono mt-1 space-y-0.5" style="color: var(--text-muted);">
+                  <div>Size: <strong style="color: var(--text-primary);">${c.size_gb} GB</strong> (reduced from ${c.orig_size_gb} GB)</div>
+                  <div>Reduction: <strong class="text-emerald-600">${c.ratio} smaller</strong></div>
+                </div>
+              </div>
+              <div class="pt-3 border-t flex items-center justify-between" style="border-color: var(--border-color);">
+                <span class="text-[10px] font-mono text-[#8B7355] font-semibold">Near-Lossless Quality</span>
+                ${c.is_loaded ? `
+                  <button onclick="deloadActiveModel()" class="px-3.5 py-1.5 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-600 text-xs font-bold transition">
+                    Unload
+                  </button>
+                ` : `
+                  <button onclick="loadCompressedModel('${c.path}')" class="px-3.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold uppercase tracking-wider transition shadow-sm">
+                    Load & Chat
+                  </button>
+                `}
+              </div>
+            </div>
+          `).join('');
+        }
+
+        lucide.createIcons();
+      } catch (e) {
+        console.error('Error refreshing models:', e);
+      }
+    }
+
+    // 1-Click Compression
+    async function triggerOneClickCompression(modelPath) {
+      const progEl = document.getElementById('modal-compression-progress');
+      progEl.classList.remove('hidden');
+      document.getElementById('mcomp-model-name').innerText = `Compressing: ${modelPath.split('/').pop()}`;
+
+      try {
+        await fetch('/api/compress', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({
+            model_path: modelPath,
+            group_size: 32,
+            outlier_ratio: 0.01
+          })
+        });
+
+        const timer = setInterval(async () => {
+          const res = await fetch('/api/compress/status');
+          const st = await res.json();
+
+          if (st.status === 'compressing') {
+            document.getElementById('mcomp-pct').innerText = `${st.percentage || 0}%`;
+            document.getElementById('mcomp-bar').style.width = `${st.percentage || 0}%`;
+            document.getElementById('mcomp-tensor').innerText = `[${st.index}/${st.total}] ${st.tensor || ''}`;
+            document.getElementById('mcomp-ratio').innerText = `Ratio: ${st.ratio || 1.0}x`;
+          } else if (st.status === 'done') {
+            clearInterval(timer);
+            document.getElementById('mcomp-pct').innerText = '100%';
+            document.getElementById('mcomp-bar').style.width = '100%';
+            document.getElementById('mcomp-tensor').innerText = 'Compression completed successfully!';
+            setTimeout(() => {
+              progEl.classList.add('hidden');
+              refreshModelsList();
+            }, 2500);
+          } else if (st.status === 'error') {
+            clearInterval(timer);
+            alert('Compression error: ' + st.error);
+            progEl.classList.add('hidden');
+          }
+        }, 800);
+
+      } catch (e) {
+        alert('Failed to launch compression: ' + e);
+        progEl.classList.add('hidden');
+      }
+    }
+
+    // Load Model into Engine
+    async function loadCompressedModel(trdcPath) {
+      try {
+        const res = await fetch('/api/engine/load', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({ trdc_path: trdcPath })
+        });
+        const data = await res.json();
+        if (data.status === 'success') {
+          closeModelsModal();
+          await updateTelemetry();
+          alert(`Model ${data.model} successfully loaded in ${data.load_time_sec}s!`);
+        } else {
+          alert('Failed to load: ' + JSON.stringify(data));
+        }
+      } catch (e) {
+        alert('Error loading model: ' + e);
+      }
+    }
+
+    // Initialize on Page Load: Resume latest conversation if exists, or show clean Welcome Hero
+    window.addEventListener('DOMContentLoaded', async () => {
+      lucide.createIcons();
+      await loadSessionsList();
+      try {
+        const res = await fetch('/api/chat/sessions');
+        const list = await res.json();
+        if (list && list.length > 0) {
+          await switchSession(list[0].id);
+        } else {
+          createNewChat();
+        }
+      } catch (e) {
+        createNewChat();
+      }
+    });
+
+    // Global shortcut: Ctrl+K / Cmd+K to start a fresh chat
+    window.addEventListener('keydown', (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        createNewChat();
+      }
+    });
+  </script>
+
+</body>
+</html>
