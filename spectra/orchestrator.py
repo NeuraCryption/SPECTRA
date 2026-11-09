@@ -110,3 +110,7 @@ class Spectra:
             )
         else:
             raise FileNotFoundError(f"Container not found and auto_compress is False for: {target_path}")
+
+    # Enterprise Python alias: spectra.load() == spectra.serve()
+    load = serve
+

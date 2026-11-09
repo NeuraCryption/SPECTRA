@@ -81,17 +81,23 @@ SPECTRA eliminates all three barriers through mathematical guarantees.
 
 ## Quickstart (30-Second Turnkey Launch)
 
-SPECTRA requires zero configuration. Clone the repository, install dependencies, and launch:
+SPECTRA requires zero manual setup. Run a single command directly after cloning:
 
+#### Linux & macOS (1-Command Turnkey Launch)
 ```bash
-# 1. Clone the repository
+git clone https://github.com/NeuraCryption/SPECTRA.git && cd SPECTRA && ./launch.sh
+```
+
+#### Windows (Command Prompt / PowerShell - 1-Command Turnkey Launch)
+```cmd
+git clone https://github.com/NeuraCryption/SPECTRA.git && cd SPECTRA && launch.bat
+```
+
+#### Cross-Platform Python (Any OS)
+```bash
 git clone https://github.com/NeuraCryption/SPECTRA.git
 cd SPECTRA
-
-# 2. Install dependencies (PyTorch, Triton, FastAPI)
 pip install -r requirements.txt
-
-# 3. Launch the Turnkey Engine & Web Dashboard
 python launch.py
 ```
 
@@ -360,29 +366,46 @@ spectra run \
 
 ## Python SDK & REST API Reference
 
-### Python SDK Integration
+### Enterprise Python SDK Integration
+
+Install directly in editable mode:
+```bash
+pip install -e .
+```
+
+Then import and use `spectra` anywhere in your Python environment:
 ```python
-from spectra import Spectra
+import spectra
 
-# Autonomous hardware inspection, execution planning, and model loading
-engine = Spectra.serve("path/to/model.trdc")
+# 1. Inspect Hardware Capability & VRAM Headroom
+profile = spectra.probe_hardware()
+print(f"Device: {profile.device_name} | VRAM: {profile.total_vram_mb:.0f} MB")
 
-# 1. Synchronous Generation
-result = engine.generate("Explain the theory of relativity in one sentence:")
+# 2. 1-Line Model Load (Direct .trdc file or cloned Hugging Face folder)
+engine = spectra.load("models/deepseek_r1_spectra.trdc")
+
+# 3. Synchronous Generation with Metrics
+result = engine.generate("Solve: What is the derivative of x^3 + 5x?")
 print(result.text)
-print(result.summary())
+print(f"Speed: {result.decode_tok_per_sec} tok/s | Active VRAM: {result.peak_vram_mb:.1f} MB")
 
-# 2. Incremental Token Streaming
-for chunk in engine.generate_stream("Write a Python Fibonacci function:"):
+# 4. Token-by-Token Streaming
+for chunk in engine.generate_stream("Write a Python Fibonacci generator:"):
     if chunk.get("token"):
         print(chunk["token"], end="", flush=True)
 
-# 3. Batched Inference Benchmark
+# 5. Batched Tensor Core Benchmark
 batch_results = engine.generate_batch([
     "Prompt 1: What is gravity?",
     "Prompt 2: Define quantum mechanics."
 ], max_new_tokens=64)
-print(f"Throughput: {batch_results['aggregate_tok_per_sec']:.2f} tok/s")
+print(f"Batch Throughput: {batch_results['aggregate_tok_per_sec']:.2f} tok/s")
+
+# 6. Autonomous Model Compression in Python (<50 MB host RAM)
+spectra.compress(
+    model_id_or_path="meta-llama/Llama-3.2-3B-Instruct",
+    output_container="models/llama3_spectra.trdc"
+)
 ```
 
 ### REST API Endpoints
