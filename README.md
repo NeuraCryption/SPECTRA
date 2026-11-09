@@ -4,7 +4,7 @@
 [![PyTorch 2.2+](https://img.shields.io/badge/PyTorch-2.2%2B-ee4c2c.svg)](https://pytorch.org/)
 [![OpenAI Triton 3.0+](https://img.shields.io/badge/OpenAI%20Triton-3.0%2B-purple.svg)](https://github.com/triton-lang/triton)
 [![CUDA 12.0+](https://img.shields.io/badge/NVIDIA%20CUDA-12.0%2B-green.svg)](https://developer.nvidia.com/cuda-toolkit)
-[![License: Apache-2.0](https://img.shields.io/badge/License-Apache%202.0-yellow.svg)](https://opensource.org/licenses/Apache-2.0)
+[![License: Non-Commercial Research](https://img.shields.io/badge/License-Non--Commercial%20Research-blue.svg)](https://neuracryption.com/spectra-t%26c)
 [![Hugging Face](https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-NeuraCryption-orange.svg)](https://huggingface.co/neuracryption)
 [![Zenodo DOI](https://img.shields.io/badge/DOI-Zenodo-10.5281%2Fzenodo.archive-blue.svg)](https://zenodo.org/)
 
@@ -38,7 +38,9 @@ Run mathematical reasoning models (such as **DeepSeek-R1-Distill**), deep transf
 10. [CLI Reference & Automation](#cli-reference--automation)
 11. [Python SDK & REST API Reference](#python-sdk--rest-api-reference)
 12. [Hardware Compatibility Guide](#hardware-compatibility-guide)
-13. [License & Citation](#license--citation)
+13. [License & Legal Terms](#license--legal-terms)
+14. [Official Code Repository](#official-code-repository)
+15. [Citation Notice](#citation-notice)
 
 ---
 
@@ -430,16 +432,43 @@ When the server is running (`python launch.py`), use standard HTTP requests:
 
 ---
 
-## License & Citation
+## License & Legal Terms
 
-SPECTRA is open-source software released under the **Apache 2.0 License**.
+The Sparse-Precision Exact Channel Tensor Reconstruction Architecture (SPECTRA), including its software, research specifications, algorithms, and the TRDC container format, constitutes proprietary intellectual property owned solely and exclusively by NeuraCryption Private Limited.
 
+### Permitted Non-Commercial Use
+A personal, non-exclusive, non-transferable, and royalty-free license is granted to natural persons, academic researchers, and peer-review evaluators. This license is strictly limited to personal study, scientific reproduction, independent verification, and non-commercial academic research.
+
+### Commercial Use Strictly Prohibited
+You may not make any commercial use of SPECTRA, including monetization, selling, redistributing for a fee, or deploying within commercial products, hosted services, APIs, or commercial model training. Commercial deployment or institutional distribution requires a separate written commercial agreement executed directly with NeuraCryption.
+
+### Governing Terms
+All access, download, reproduction, benchmarking, and utilization of SPECTRA are governed exclusively by the NeuraCryption Global Terms of Use, which can be found at [neuracryption.com/spectra-t&c](https://neuracryption.com/spectra-t&c). Copyright &copy; 2026 NeuraCryption Private Limited.
+
+---
+
+## Official Code Repository
+The official open-source evaluation code and reference implementation are hosted on GitHub:  
+[https://github.com/NeuraCryption/SPECTRA](https://github.com/NeuraCryption/SPECTRA)
+
+---
+
+## Citation Notice
+Scholarly citation, academic critique, and non-commercial peer-review benchmarking are expressly permitted. If you utilize the SPECTRA architecture or runtime in your academic work, please cite the official research specification:
+
+### BibTeX:
 ```bibtex
-@software{spectra2026,
-  author = {NeuraCryption Infrastructure Research Lab},
-  title = {SPECTRA: Sparse-Precision Exact Channel Tensor Reconstruction Architecture for Hardware-Saturated Edge Inference},
-  year = {2026},
-  url = {https://github.com/NeuraCryption/SPECTRA},
-  note = {Universal 4-bit model compression engine and Triton fused execution runtime}
+@article{neuracryption2026spectra,
+  title={SPECTRA: Sparse-Precision Exact Channel Tensor Reconstruction Architecture for Hardware-Saturated Edge Inference},
+  author={{NeuraCryption Private Limited}},
+  year={2026},
+  month={11},
+  address={Pune, Maharashtra, India},
+  url={https://github.com/NeuraCryption/SPECTRA}
 }
+```
+
+### Plain Text / APA:
+```text
+NeuraCryption Private Limited. (2026, November). SPECTRA: Sparse-Precision Exact Channel Tensor Reconstruction Architecture for Hardware-Saturated Edge Inference. Pune, Maharashtra, India. Retrieved from https://github.com/NeuraCryption/SPECTRA
 ```
