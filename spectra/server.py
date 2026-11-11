@@ -1,11 +1,3 @@
-# Copyright (c) 2026 NeuraCryption Private Limited (neuracryption.com). All Rights Reserved.
-"""
-SPECTRA Localhost Serving Engine & Web GUI Backend
-==================================================
-FastAPI backend providing real-time hardware telemetry, model discovery,
-streaming zero-RAM-spike compression, and token-streaming inference.
-"""
-
 import os
 os.environ['PYTORCH_CUDA_ALLOC_CONF'] = 'expandable_segments:True'
 import sys
@@ -442,16 +434,40 @@ def discover_models() -> Dict[str, Any]:
     seen_trdc_paths = set()
     seen_raw_paths = set()
 
-    # Search locations (roots, current directory, and standard subdirectories)
+    home = Path.home()
+
+    # System-wide comprehensive search locations
     search_dirs = [
+        BASE_DIR / "models",
+        COMPRESSED_DIR,
+        Path.cwd() / "models",
+        Path.cwd() / "compressed_models",
         BASE_DIR,
         Path.cwd(),
-        COMPRESSED_DIR,
-        BASE_DIR / "models",
-        Path.cwd() / "models",
-        Path.home() / "huggingface_models",
-        Path.home() / "compressed_models",
+        home / "models",
+        home / "huggingface_models",
+        home / "compressed_models",
+        home / "Downloads",
+        home / ".cache" / "huggingface" / "hub",
+        home / ".cache" / "huggingface",
+        home / ".cache" / "lm-studio" / "models",
+        home / ".ollama" / "models",
+        home / "text-generation-webui" / "models",
+        home / ".gemini" / "antigravity" / "scratch",
+        home / ".gemini" / "antigravity" / "scratch" / "compressed_models",
     ]
+
+    for env_k in ["HF_HOME", "HUGGINGFACE_HUB_CACHE", "TRANSFORMERS_CACHE", "MODELS_DIR", "MODEL_PATH"]:
+        env_v = os.environ.get(env_k)
+        if env_v and Path(env_v).exists():
+            search_dirs.append(Path(env_v))
+
+    if os.name == "nt":
+        for drive in ["C", "D", "E", "F"]:
+            dp = Path(f"{drive}:\\models")
+            if dp.exists():
+                search_dirs.append(dp)
+
     valid_search_dirs = []
     for d in search_dirs:
         try:
@@ -478,9 +494,18 @@ def discover_models() -> Dict[str, Any]:
         try:
             for sub in s_dir.iterdir():
                 if sub.is_dir() and not sub.name.startswith(".") and sub.name not in ["__pycache__", "chat_sessions", "node_modules", "venv", ".venv"]:
-                    sub_res = sub.resolve()
-                    if sub_res not in candidate_folders:
-                        candidate_folders.append(sub_res)
+                    if sub.name.startswith("models--"):
+                        snaps = sub / "snapshots"
+                        if snaps.exists() and snaps.is_dir():
+                            for snap in snaps.iterdir():
+                                if snap.is_dir():
+                                    sub_res = snap.resolve()
+                                    if sub_res not in candidate_folders:
+                                        candidate_folders.append(sub_res)
+                    else:
+                        sub_res = sub.resolve()
+                        if sub_res not in candidate_folders:
+                            candidate_folders.append(sub_res)
         except Exception:
             pass
 
@@ -503,6 +528,10 @@ def discover_models() -> Dict[str, Any]:
             is_moe = any(k in str(cfg).lower() for k in ['num_experts', 'moe', 'experts']) if cfg else False
 
             clean_name = p.name.replace("_", " ").replace("-SPECTRA", "").replace("-spectra", "").title()
+            if "models--" in str(p):
+                parts = str(p).split("models--")[-1].split(os.sep)[0].split("--")
+                if len(parts) >= 2:
+                    clean_name = f"{parts[0].title()} {parts[1].replace('_', ' ').replace('-', ' ').title()}"
             if cfg.get("_name_or_path") and not str(cfg["_name_or_path"]).startswith("/"):
                 clean_name = str(cfg["_name_or_path"]).split("/")[-1].replace("_", " ").title()
 

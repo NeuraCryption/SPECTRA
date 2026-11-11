@@ -1,22 +1,13 @@
-# Copyright (c) 2026 NeuraCryption Private Limited (neuracryption.com). All Rights Reserved.
-"""
-Hardware Telemetry and Execution Planner
-=======================================
-Inspects host CPU, RAM, and GPU devices to compute optimal memory budgets
-and execution strategies for model inference.
-"""
-
 import os
-import gc
 import psutil
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Dict, Any, Optional, Tuple, List
 
 import torch
 
 @dataclass
 class HardwareProfile:
-    device_type: str                  # 'cuda' or 'cpu'
+    device_type: str
     device_index: int
     device_name: str
     compute_capability: Tuple[int, int]
@@ -28,7 +19,7 @@ class HardwareProfile:
     supports_tensor_cores: bool
     supports_bf16: bool
     supports_cuda_graphs: bool
-    tensor_core_arch: str             # 'Ampere', 'Ada', 'Hopper', 'Turing', 'Volta', 'None'
+    tensor_core_arch: str
 
     def summary_card(self) -> str:
         return (
@@ -40,15 +31,15 @@ class HardwareProfile:
 
 @dataclass
 class ExecutionPlan:
-    mode: str                         # 'FULL_GPU_RESIDENT', 'HYBRID_DYNAMIC_OFFLOAD', 'CPU_RESIDENT'
-    gpu_layers: int                   # Number of transformer layers resident in VRAM
-    cpu_layers: int                   # Number of transformer layers offloaded to host
-    enable_cuda_graphs: bool          # Can execute via zero-CPU hardware execution graph
-    target_device: str                # 'cuda:0', 'cpu'
-    kv_cache_budget_mb: float         # Reserved VRAM for continuous KV Cache
-    safety_margin_mb: float           # Hard margin kept unallocated to prevent driver OOM
-    chunk_size_prefill: int           # Chunk size for large vocab projections
-    recommended_batch_size: int       # Recommended batch size based on memory bandwidth
+    mode: str
+    gpu_layers: int
+    cpu_layers: int
+    enable_cuda_graphs: bool
+    target_device: str
+    kv_cache_budget_mb: float
+    safety_margin_mb: float
+    chunk_size_prefill: int
+    recommended_batch_size: int
 
     def plan_card(self) -> str:
         return (
@@ -59,10 +50,7 @@ class ExecutionPlan:
 
 
 class HardwareInspector:
-    """
-    Evaluates hardware capabilities and computes memory allocation plans.
-    """
-    SAFETY_HEADROOM_MB = 450.0 # Safety headroom to protect against driver/Xorg spikes
+    SAFETY_HEADROOM_MB = 450.0
 
     @classmethod
     def probe(cls, device_index: int = 0) -> HardwareProfile:

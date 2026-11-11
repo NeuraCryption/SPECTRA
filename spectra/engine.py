@@ -1,10 +1,3 @@
-# Copyright (c) 2026 NeuraCryption Private Limited (neuracryption.com). All Rights Reserved.
-"""
-Inference Runtime Engine
-========================
-High-throughput inference engine with Triton fused kernels and hardware-aware memory allocation.
-"""
-
 import os
 os.environ['PYTORCH_CUDA_ALLOC_CONF'] = 'expandable_segments:True'
 import sys

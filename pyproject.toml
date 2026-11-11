@@ -31,11 +31,13 @@ classifiers = [
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Operating System :: POSIX :: Linux",
+    "Operating System :: Microsoft :: Windows",
+    "Operating System :: MacOS",
     "Topic :: Scientific/Engineering :: Artificial Intelligence",
 ]
 dependencies = [
     "torch>=2.2.0",
-    "triton>=2.1.0",
+    "triton>=2.1.0; platform_system == 'Linux'",
     "transformers>=4.40.0",
     "accelerate>=0.28.0",
     "fastapi>=0.100.0",

@@ -1,5 +1,5 @@
 torch>=2.2.0
-triton>=2.1.0
+triton>=2.1.0; sys_platform == 'linux'
 transformers>=4.40.0
 accelerate>=0.28.0
 fastapi>=0.100.0

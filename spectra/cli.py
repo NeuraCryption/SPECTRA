@@ -1,9 +1,3 @@
-# Copyright (c) 2026 NeuraCryption Private Limited (neuracryption.com). All Rights Reserved.
-"""
-SPECTRA Unified Command Line Interface
-======================================
-"""
-
 import sys
 import socket
 import argparse

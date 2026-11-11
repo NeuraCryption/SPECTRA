@@ -95,19 +95,19 @@ git clone https://github.com/NeuraCryption/SPECTRA.git && cd SPECTRA && ./launch
 git clone https://github.com/NeuraCryption/SPECTRA.git && cd SPECTRA && launch.bat
 ```
 
-#### Cross-Platform Python (Any OS)
+#### Cross-Platform Python (Any OS &bull; Python 3.10+)
 ```bash
 git clone https://github.com/NeuraCryption/SPECTRA.git
 cd SPECTRA
-pip install -r requirements.txt
-python launch.py
+python3 launch.py
 ```
 
 The launcher autonomously:
-1. Probes your physical GPU compute capability, VRAM headroom, and host RAM via NVML.
-2. Scans your directory tree for all cloned or local model repositories.
-3. Finds an available network port (default: `7860`).
-4. Launches the high-throughput local server and opens your browser to `http://localhost:7860`.
+1. Verifies Python 3.10+ and automatically handshakes with your Python environment.
+2. Probes your physical GPU compute capability, VRAM headroom, and host RAM via NVML.
+3. Performs a system-wide scan across all local and cached model locations.
+4. Finds an available network port (default: `7860`).
+5. Launches the high-throughput local server and opens your browser to `http://localhost:7860`.
 
 ---
 
@@ -134,11 +134,11 @@ The built-in Web Dashboard provides seamless autonomous operation:
 |   └───────────────────────────────────────────────────────────────────────────────────┘ |
 |   The solution is x = 9.                                                                |
 |                                                                                         |
-|   [ 78.5 tok/s | Prefill: 262 tok/s | Latency: 12.7 ms/tok | 100% GPU Resident ]        |
+|   [ 80.1 tok/s | Prefill: 262 tok/s | Latency: 12.5 ms/tok | 100% GPU Resident ]        |
 +-----------------------------------------------------------------------------------------+
 ```
 
-- **1-Click Hardware Optimization:** Run `python launch.py` to auto-calibrate buffer sizes to your physical VRAM and RAM.
+- **1-Click Hardware Optimization:** Run `python3 launch.py` to auto-calibrate buffer sizes to your physical VRAM and RAM.
 - **1-Click Model Loading:** Click **"Load & Chat"** to instantiate the architecture and stream weights into GPU VRAM in **1.5 to 3.8 seconds**.
 - **1-Click Autonomous Compression:** Drop any raw Hugging Face folder into the workspace and click **"Compress Model"** to generate a 4-bit `.trdc` container in minutes with zero calibration data.
 - **1-Click DeepSeek Thinking Mode:** Reasoning models (e.g. DeepSeek-R1 `<think>` tokens) render in a collapsible styled drawer with live step latency and token metrics.
@@ -167,12 +167,12 @@ git clone https://huggingface.co/neuracryption/LFM-3-1.7B-SPECTRA
 
 ### Step 2: Run Immediate CLI Inference
 ```bash
-python run_inference.py --prompt "Explain quantum computing in simple terms:"
+python3 launch.py run --model ./DeepSeek-R1-Distill-1.5B-SPECTRA --prompt "Explain quantum computing in simple terms:"
 ```
 
 ### Step 3: Or Open the Web Dashboard
 ```bash
-python launch.py
+python3 launch.py
 ```
 The scanner automatically registers all cloned models and populates the **Ready-to-Run** grid.
 
@@ -341,24 +341,24 @@ The Web UI (`web/index.html`) provides complete autonomous control:
 
 ## CLI Reference & Automation
 
-SPECTRA includes a unified command-line interface:
+SPECTRA includes a unified command-line interface, accessible either via `python3 launch.py` or `spectra`:
 
 ```bash
 # 1. Launch Web Dashboard
-spectra ui --port 7860
+python3 launch.py ui --port 7860
 
 # 2. Probe Hardware Telemetry
-spectra status
+python3 launch.py status
 
 # 3. Compress a Model
-spectra compress \
+python3 launch.py compress \
   --model deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B \
   --output ./models/deepseek_r1_spectra.trdc \
   --group-size 32 \
   --outliers 0.01
 
 # 4. Run CLI Generation
-spectra run \
+python3 launch.py run \
   --model ./models/deepseek_r1_spectra.trdc \
   --prompt "Solve 3x + 15 = 42 step-by-step." \
   --max-tokens 512
@@ -411,7 +411,7 @@ spectra.compress(
 ```
 
 ### REST API Endpoints
-When the server is running (`python launch.py`), use standard HTTP requests:
+When the server is running (`python3 launch.py`), use standard HTTP requests:
 
 - **Load Model:** `POST /api/engine/load` with `{"trdc_path": "path/to/model.trdc"}`
 - **Unload Model:** `POST /api/engine/unload`

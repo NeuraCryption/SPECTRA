@@ -1,26 +1,8 @@
-# Copyright (c) 2026 NeuraCryption Private Limited (neuracryption.com). All Rights Reserved.
-"""
-SPECTRA Fused Triton Quantized Compute Kernels
-==============================================
-Fused operations for quantized matrix multiplication:
-1. `fused_w4a16_gemv_hdsq`: Single-token (M=1) register-fused GEMV with outlier accumulation.
-   - Dequantizes 4-bit Group-32 weights in register.
-   - Accumulates sparse FP16 outlier channels directly in accumulator.
-   - Zero dynamic VRAM allocations per token step.
-2. `batched_w4a16_gemm`: Batched (M > 1) Tensor Core GEMM.
-   - Tiled 2D matrix multiplication using hardware Tensor Cores (`tl.dot`).
-   - In-kernel outlier accumulation for prompt prefill.
-"""
-
 import math
 import torch
 import triton
 import triton.language as tl
 from typing import Optional
-
-# =============================================================================
-# KERNEL 1: REGISTER-FUSED W4A16 GEMV WITH IN-KERNEL OUTLIER ACCUMULATION (B=1)
-# =============================================================================
 
 @triton.autotune(
     configs=[
@@ -158,11 +140,6 @@ def fused_w4a16_gemv_hdsq(
     out: Optional[torch.Tensor] = None,
     marlin_layout: bool = False
 ) -> torch.Tensor:
-    """
-    Hardware-saturated fused GEMV with in-kernel outlier accumulation.
-    Executes in a single hardware kernel launch with ZERO auxiliary launches.
-    Supports both Marlin interleaved (0..15, 16..31) and legacy Even-Odd (2k, 2k+1) layouts.
-    """
     orig_dim = x.ndim
     if orig_dim == 1:
         x = x.unsqueeze(0)
@@ -360,11 +337,6 @@ def batched_w4a16_gemm(
     outlier_w: Optional[torch.Tensor] = None,
     marlin_layout: bool = False
 ) -> torch.Tensor:
-    """
-    High-throughput Batched W4A16 GEMM for batch size B >= 2 or sequence length S > 1.
-    Supports both Marlin interleaved (0..15, 16..31) and legacy Even-Odd (2k, 2k+1) layouts.
-    Natively executes on Ampere+ BF16 and FP16 Tensor Cores with zero range clipping.
-    """
     orig_shape = a.shape
     M = a.numel() // a.shape[-1]
     K = a.shape[-1]

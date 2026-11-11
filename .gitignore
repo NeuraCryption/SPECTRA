@@ -18,3 +18,5 @@ htmlcov/
 # Large binary weights (users clone them via Hugging Face Git LFS)
 *.trdc
 compressed_models/
+models/
+

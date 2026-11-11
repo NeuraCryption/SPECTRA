@@ -1,10 +1,3 @@
-# Copyright (c) 2026 NeuraCryption Private Limited (neuracryption.com). All Rights Reserved.
-"""
-Model Compressor
-================
-Streaming 4-bit group-quantization with outlier channel preservation.
-"""
-
 import os
 import gc
 import json
@@ -34,12 +27,6 @@ NF4_CODEBOOK = torch.tensor([
 ])
 
 def fast_walsh_hadamard_transform(x: torch.Tensor, normalize: bool = True) -> torch.Tensor:
-    """
-    Computes Fast Walsh-Hadamard Transform (FWHT) along the last dimension using
-    vectorized PyTorch tensor butterfly reshapes (100x faster than scalar Python loops).
-    Last dimension must be a power of 2. O(N log N) time complexity.
-    Rotates coordinate system to eliminate outlier spikes and Gaussianize channel kurtosis.
-    """
     orig_shape = x.shape
     d = orig_shape[-1]
     assert (d & (d - 1)) == 0, f"Last dimension ({d}) must be a power of 2 for FWHT"
@@ -55,9 +42,6 @@ def fast_walsh_hadamard_transform(x: torch.Tensor, normalize: bool = True) -> to
     return res.reshape(orig_shape)
 
 class SpectraCompressor:
-    """
-    Universal Streaming LLM Compressor.
-    """
     def __init__(
         self,
         group_size: int = 32,
