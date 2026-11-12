@@ -145,7 +145,15 @@ class HardwareInspector:
         if profile is None:
             profile = cls.probe()
 
-        if profile.device_type == "cpu" or profile.free_vram_mb <= cls.SAFETY_HEADROOM_MB:
+        # Dynamic safety headroom based on GPU memory tier
+        if profile.total_vram_mb <= 4500.0:
+            headroom_mb = 750.0
+        elif profile.total_vram_mb <= 8500.0:
+            headroom_mb = 650.0
+        else:
+            headroom_mb = cls.SAFETY_HEADROOM_MB
+
+        if profile.device_type == "cpu" or profile.free_vram_mb <= headroom_mb:
             return ExecutionPlan(
                 mode="CPU_RESIDENT",
                 gpu_layers=0,
@@ -170,7 +178,7 @@ class HardwareInspector:
         total_kv_mb = (kv_bytes_per_token_per_layer * max_seq_len * batch_size * num_layers) / (1024**2)
 
         # Available budget for weights
-        usable_vram = profile.free_vram_mb - cls.SAFETY_HEADROOM_MB - total_kv_mb
+        usable_vram = profile.free_vram_mb - headroom_mb - total_kv_mb
 
         # Estimate bytes per layer
         # Model size includes embeddings + lm_head (~20%) and layers (~80%)
@@ -181,7 +189,7 @@ class HardwareInspector:
         available_for_layers = usable_vram - base_overhead_mb
 
         # 2. Decision Logic
-        if model_size_mb + total_kv_mb <= (profile.free_vram_mb - cls.SAFETY_HEADROOM_MB):
+        if model_size_mb + total_kv_mb <= (profile.free_vram_mb - headroom_mb):
             # Mode A: Full GPU Resident
             return ExecutionPlan(
                 mode="FULL_GPU_RESIDENT",
@@ -190,7 +198,7 @@ class HardwareInspector:
                 enable_cuda_graphs=profile.supports_cuda_graphs,
                 target_device=f"cuda:{profile.device_index}",
                 kv_cache_budget_mb=round(total_kv_mb, 2),
-                safety_margin_mb=cls.SAFETY_HEADROOM_MB,
+                safety_margin_mb=headroom_mb,
                 chunk_size_prefill=256,
                 recommended_batch_size=min(4, max(1, int(usable_vram // (total_kv_mb or 1))))
             )
@@ -207,7 +215,7 @@ class HardwareInspector:
                 enable_cuda_graphs=False, # Graphs require full static memory residency
                 target_device=f"cuda:{profile.device_index}",
                 kv_cache_budget_mb=round(total_kv_mb, 2),
-                safety_margin_mb=cls.SAFETY_HEADROOM_MB,
+                safety_margin_mb=headroom_mb,
                 chunk_size_prefill=128,
                 recommended_batch_size=1
             )

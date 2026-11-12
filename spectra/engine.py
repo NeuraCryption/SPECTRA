@@ -633,10 +633,23 @@ class SpectraGroup32QuantizedLayer(QuantizedLayer if issubclass(QuantizedLayer, 
         t_g = t.reshape(-1, num_groups, self.group_size)
         t_min = t_g.amin(dim=-1, keepdim=True)
         t_max = t_g.amax(dim=-1, keepdim=True)
-        scales = (t_max - t_min) / 15.0
+        diff = t_max - t_min
+        is_constant = (diff < 1e-8)
+
+        scales = torch.where(is_constant, torch.where(t_min == 0, torch.ones_like(t_min), torch.abs(t_min)), diff / 15.0)
         scales = torch.clamp(scales, min=1e-8)
-        zeros = torch.clamp(torch.round(-t_min / scales), 0, 15).to(torch.uint8)
-        q = torch.clamp(torch.round((t_g - (-zeros.float() * scales)) / scales), 0, 15).to(torch.uint8)
+
+        zeros = torch.where(
+            is_constant,
+            torch.where(t_min < 0, torch.ones_like(t_min, dtype=torch.uint8), torch.zeros_like(t_min, dtype=torch.uint8)),
+            torch.clamp(torch.round(-t_min / scales), 0, 15).to(torch.uint8)
+        )
+
+        q = torch.where(
+            is_constant,
+            torch.where(t_min > 0, torch.ones_like(t_g, dtype=torch.uint8), torch.zeros_like(t_g, dtype=torch.uint8)),
+            torch.clamp(torch.round((t_g - (-zeros.float() * scales)) / scales), 0, 15).to(torch.uint8)
+        )
         q_even = q[:, :, 0::2]
         q_odd = q[:, :, 1::2]
         packed = (q_even | (q_odd << 4)).to(torch.uint8)
@@ -765,13 +778,17 @@ class SpectraUniversalEngine:
         cls,
         trdc_path: Union[str, Path],
         model_dir: Optional[Union[str, Path]] = None,
-        device_index: int = 0
+        device_index: int = 0,
+        trust_remote_code: bool = False
     ) -> "SpectraUniversalEngine":
         """
         Inspects hardware, computes memory allocation plan, and initializes model on target device.
         """
-        trdc_path = Path(trdc_path)
+        trdc_path = Path(trdc_path).resolve()
         assert trdc_path.exists(), f"Container not found: {trdc_path}"
+        repo_root = Path(__file__).resolve().parent.parent
+        is_local_path = any(trdc_path.is_relative_to(r) for r in [Path.home().resolve(), Path.cwd().resolve(), repo_root])
+        trust_remote_code = trust_remote_code or is_local_path or (os.environ.get("SPECTRA_TRUST_REMOTE_CODE", "0").lower() in ("1", "true", "yes"))
         t0 = time.time()
 
         # 1. Probe Hardware
@@ -847,11 +864,11 @@ class SpectraUniversalEngine:
         for d in candidate_dirs:
             if d.exists() and (d / "config.json").exists():
                 try:
-                    cfg = AutoConfig.from_pretrained(str(d), trust_remote_code=True)
+                    cfg = AutoConfig.from_pretrained(str(d), trust_remote_code=trust_remote_code)
                     config = cfg
                     resolved_dir = d
                     try:
-                        tokenizer = AutoTokenizer.from_pretrained(str(d), trust_remote_code=True)
+                        tokenizer = AutoTokenizer.from_pretrained(str(d), trust_remote_code=trust_remote_code)
                     except Exception:
                         pass
                     break
@@ -877,14 +894,14 @@ class SpectraUniversalEngine:
             for d in candidate_dirs:
                 if d.exists() and ((d / "tokenizer.json").exists() or (d / "tokenizer_config.json").exists()):
                     try:
-                        tokenizer = AutoTokenizer.from_pretrained(str(d), trust_remote_code=True)
+                        tokenizer = AutoTokenizer.from_pretrained(str(d), trust_remote_code=trust_remote_code)
                         break
                     except Exception:
                         pass
             # Fallback 2: check original model path if available
             if tokenizer is None and config_dict.get('_name_or_path'):
                 try:
-                    tokenizer = AutoTokenizer.from_pretrained(config_dict['_name_or_path'], trust_remote_code=True)
+                    tokenizer = AutoTokenizer.from_pretrained(config_dict['_name_or_path'], trust_remote_code=trust_remote_code)
                 except Exception:
                     pass
 
@@ -904,22 +921,22 @@ class SpectraUniversalEngine:
             arch = (config_dict.get('architectures') or [None])[0]
             if arch and hasattr(transformers, arch):
                 try:
-                    model = getattr(transformers, arch).from_config(config, trust_remote_code=True)
+                    model = getattr(transformers, arch).from_config(config, trust_remote_code=trust_remote_code)
                 except Exception:
                     pass
             if model is None:
                 try:
                     from transformers import AutoModelForImageTextToText
                     if hasattr(config, 'vision_config') or 'vision' in str(config_dict):
-                        model = AutoModelForImageTextToText.from_config(config, trust_remote_code=True)
+                        model = AutoModelForImageTextToText.from_config(config, trust_remote_code=trust_remote_code)
                 except Exception:
                     pass
             if model is None:
                 try:
-                    model = AutoModelForCausalLM.from_config(config, trust_remote_code=True)
+                    model = AutoModelForCausalLM.from_config(config, trust_remote_code=trust_remote_code)
                 except Exception:
                     from transformers import AutoModel
-                    model = AutoModel.from_config(config, trust_remote_code=True)
+                    model = AutoModel.from_config(config, trust_remote_code=trust_remote_code)
 
         target_dev = torch.device(plan.target_device)
 
@@ -978,8 +995,9 @@ class SpectraUniversalEngine:
                                 oi_c = torch.frombuffer(oi_b, dtype=torch.int32).to(dtype=torch.int64).pin_memory()
                             else:
                                 oi_c = torch.frombuffer(oi_b, dtype=torch.int64).pin_memory()
-                            ow_raw_dtype = torch.bfloat16 if meta.get('outlier_w_dtype') == 'bfloat16' else torch.float16
-                            ow_c = torch.frombuffer(ow_b, dtype=ow_raw_dtype).reshape(N, -1).to(dtype=torch.float16).pin_memory()
+                            ow_meta_dt = meta.get('outlier_w_dtype', 'float16')
+                            ow_raw_dtype = getattr(torch, ow_meta_dt, torch.float16)
+                            ow_c = torch.frombuffer(ow_b, dtype=ow_raw_dtype).reshape(N, -1).to(dtype=ow_raw_dtype).pin_memory()
                         else:
                             oi_c, ow_c = None, None
                     else:
@@ -1003,8 +1021,9 @@ class SpectraUniversalEngine:
                                 oi_c = torch.frombuffer(oi_b, dtype=torch.int32).to(device=target_dev, dtype=torch.int64)
                             else:
                                 oi_c = torch.frombuffer(oi_b, dtype=torch.int64).to(target_dev)
-                            ow_raw_dtype = torch.bfloat16 if meta.get('outlier_w_dtype') == 'bfloat16' else torch.float16
-                            ow_c = torch.frombuffer(ow_b, dtype=ow_raw_dtype).reshape(N, -1).to(device=target_dev, dtype=torch.float16)
+                            ow_meta_dt = meta.get('outlier_w_dtype', 'float16')
+                            ow_raw_dtype = getattr(torch, ow_meta_dt, torch.float16)
+                            ow_c = torch.frombuffer(ow_b, dtype=ow_raw_dtype).reshape(N, -1).to(device=target_dev, dtype=ow_raw_dtype)
                         else:
                             oi_c, ow_c = None, None
 
@@ -1075,7 +1094,7 @@ class SpectraUniversalEngine:
                         'bool': torch.bool
                     }
                     raw_dtype = dtype_map.get(meta_dtype, torch.bfloat16 if ttype == 'lossless_bf16' else torch.float16)
-                    target_model_dtype = raw_dtype if (not raw_dtype.is_floating_point or raw_dtype == torch.float32) else (torch.bfloat16 if profile.supports_bf16 else torch.float16)
+                    target_model_dtype = raw_dtype
                     if is_layer_offloaded:
                         t = torch.frombuffer(raw, dtype=raw_dtype).reshape(shape).to(dtype=target_model_dtype).pin_memory()
                     else:
@@ -1187,6 +1206,11 @@ class SpectraUniversalEngine:
 
         for p_name, p in model.named_parameters():
             if p.is_meta:
+                if p.numel() > 100_000 or p.ndim >= 2:
+                    raise RuntimeError(
+                        f"Model weight binding incomplete: parameter '{p_name}' (shape: {tuple(p.shape)}) remained unbound on meta device. "
+                        f"This occurs when model skeleton architecture does not match container weights or custom architecture code was not executed."
+                    )
                 parts = p_name.split('.')
                 m = model
                 for part in parts[:-1]:

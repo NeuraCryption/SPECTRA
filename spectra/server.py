@@ -15,7 +15,7 @@ from pathlib import Path
 from typing import Optional, Dict, Any, List
 
 import torch
-from fastapi import FastAPI, BackgroundTasks, HTTPException
+from fastapi import FastAPI, BackgroundTasks, HTTPException, Request
 from fastapi.responses import HTMLResponse, StreamingResponse, JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -34,6 +34,20 @@ app.add_middleware(
     allow_methods=["GET", "POST", "OPTIONS"],
     allow_headers=["*"],
 )
+
+API_KEY = os.environ.get("SPECTRA_API_KEY", "").strip()
+
+@app.middleware("http")
+async def api_key_auth_middleware(request: Request, call_next):
+    global API_KEY
+    if API_KEY and request.url.path.startswith("/api/"):
+        auth_header = request.headers.get("Authorization", "")
+        api_key_header = request.headers.get("X-API-Key", "")
+        token = auth_header.replace("Bearer ", "").strip() if auth_header.startswith("Bearer ") else auth_header.strip()
+        provided = api_key_header.strip() or token
+        if provided != API_KEY:
+            return JSONResponse(status_code=401, content={"detail": "Unauthorized: invalid or missing SPECTRA_API_KEY."})
+    return await call_next(request)
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 COMPRESSED_DIR = BASE_DIR / "compressed_models"
@@ -682,8 +696,9 @@ class CompressRequest(BaseModel):
     output_filename: Optional[str] = None
     group_size: int = 32
     outlier_ratio: float = 0.01
+    trust_remote_code: bool = False
 
-def _run_compression_task(model_path: str, output_path: str, group_size: int, outlier_ratio: float):
+def _run_compression_task(model_path: str, output_path: str, group_size: int, outlier_ratio: float, trust_remote_code: bool = False):
     global COMPRESSION_STATE
     try:
         COMPRESSION_STATE["status"] = "compressing"
@@ -697,7 +712,8 @@ def _run_compression_task(model_path: str, output_path: str, group_size: int, ou
         compressor = SpectraCompressor(
             group_size=group_size,
             base_outlier_ratio=outlier_ratio,
-            adaptive_kurtosis=True
+            adaptive_kurtosis=True,
+            trust_remote_code=trust_remote_code
         )
         res = compressor.compress(
             model_id_or_path=model_path,
@@ -710,6 +726,11 @@ def _run_compression_task(model_path: str, output_path: str, group_size: int, ou
     except Exception as e:
         COMPRESSION_STATE["status"] = "error"
         COMPRESSION_STATE["error"] = str(e)
+    finally:
+        gc.collect()
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+            torch.cuda.synchronize()
 
 @app.post("/api/compress")
 def api_compress(req: CompressRequest, background_tasks: BackgroundTasks):
@@ -730,7 +751,7 @@ def api_compress(req: CompressRequest, background_tasks: BackgroundTasks):
     if not out_path.is_relative_to(COMPRESSED_DIR.resolve()):
         raise HTTPException(status_code=400, detail="Invalid output filename")
 
-    background_tasks.add_task(_run_compression_task, str(m_path), str(out_path), req.group_size, req.outlier_ratio)
+    background_tasks.add_task(_run_compression_task, str(m_path), str(out_path), req.group_size, req.outlier_ratio, req.trust_remote_code)
     return {"message": "Compression started", "target": str(out_path)}
 
 @app.get("/api/compress/status")
@@ -739,6 +760,7 @@ def api_compress_status():
 
 class LoadModelRequest(BaseModel):
     trdc_path: str
+    trust_remote_code: bool = False
 
 @app.post("/api/engine/load")
 def api_engine_load(req: LoadModelRequest):
@@ -771,7 +793,8 @@ def api_engine_load(req: LoadModelRequest):
                 torch.cuda.synchronize()
 
         try:
-            engine = Spectra.serve(trdc_path)
+            effective_trust_remote = req.trust_remote_code or allowed
+            engine = Spectra.serve(trdc_path, trust_remote_code=effective_trust_remote)
             ACTIVE_ENGINE = engine
             ACTIVE_MODEL_PATH = str(trdc_path)
             dt = time.time() - t0
@@ -785,6 +808,23 @@ def api_engine_load(req: LoadModelRequest):
                 "plan_mode": engine.plan.mode
             }
         except Exception as e:
+            if 'engine' in locals() and engine is not None:
+                try:
+                    engine.unload()
+                except Exception:
+                    pass
+                del engine
+            if ACTIVE_ENGINE:
+                try:
+                    ACTIVE_ENGINE.unload()
+                except Exception:
+                    pass
+                ACTIVE_ENGINE = None
+            ACTIVE_MODEL_PATH = None
+            gc.collect()
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
+                torch.cuda.synchronize()
             import traceback
             err_msg = str(e)
             print(f"[SPECTRA Load Error] Failed to load {trdc_path.name}: {err_msg}")
@@ -809,11 +849,20 @@ def api_engine_unload():
             del ACTIVE_ENGINE
             ACTIVE_ENGINE = None
             ACTIVE_MODEL_PATH = None
-            gc.collect()
-            if torch.cuda.is_available():
-                torch.cuda.empty_cache()
-                torch.cuda.synchronize()
+        gc.collect()
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+            torch.cuda.synchronize()
         return {"status": "unloaded", "vram_allocated_mb": 0.0}
+
+@app.post("/api/engine/clear_cache")
+def api_engine_clear_cache():
+    gc.collect()
+    if torch.cuda.is_available():
+        torch.cuda.empty_cache()
+        torch.cuda.synchronize()
+    vram = torch.cuda.memory_allocated() / (1024**2) if torch.cuda.is_available() else 0.0
+    return {"status": "cleared", "vram_allocated_mb": vram}
 
 @app.post("/api/engine/stop")
 def api_engine_stop():
@@ -1068,7 +1117,23 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="SPECTRA Universal Model Serving Server")
     parser.add_argument("--host", type=str, default="127.0.0.1", help="Host IP")
     parser.add_argument("--port", type=int, default=7860, help="Server port")
+    parser.add_argument("--api-key", type=str, default=None, help="Optional API key for securing API endpoints")
+    parser.add_argument("--trust-remote-code", action="store_true", help="Allow custom modeling code execution from model repos")
     args = parser.parse_args()
+
+    if args.api_key:
+        os.environ["SPECTRA_API_KEY"] = args.api_key
+        API_KEY = args.api_key
+    if args.trust_remote_code:
+        os.environ["SPECTRA_TRUST_REMOTE_CODE"] = "1"
+
+    if args.host in ("0.0.0.0", "::") and not os.environ.get("SPECTRA_API_KEY"):
+        print("\n" + "!" * 70)
+        print("  [SECURITY NOTICE] Binding to 0.0.0.0 without SPECTRA_API_KEY set.")
+        print("  All model management and inference endpoints are open to network access.")
+        print("  For production or exposed deployments, configure --api-key or SPECTRA_API_KEY.")
+        print("!" * 70 + "\n")
+
     print(f"\n[SPECTRA] Launching Universal AI Engine on http://{args.host}:{args.port}")
     uvicorn.run(app, host=args.host, port=args.port)
 

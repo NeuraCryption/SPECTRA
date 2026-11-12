@@ -47,12 +47,18 @@ class SpectraCompressor:
         group_size: int = 32,
         base_outlier_ratio: float = 0.01,
         adaptive_kurtosis: bool = True,
-        hadamard_incoherence: bool = False
+        hadamard_incoherence: bool = False,
+        trust_remote_code: bool = False
     ):
+        if group_size != 32:
+            raise ValueError(f"SPECTRA currently requires group_size=32 (Group-32 microscales). Received group_size={group_size}.")
+        if hadamard_incoherence:
+            raise NotImplementedError("hadamard_incoherence is disabled pending paired online activation transformation support.")
         self.group_size = group_size
         self.base_outlier_ratio = base_outlier_ratio
         self.adaptive_kurtosis = adaptive_kurtosis
         self.hadamard_incoherence = hadamard_incoherence
+        self.trust_remote_code = trust_remote_code or (os.environ.get("SPECTRA_TRUST_REMOTE_CODE", "0").lower() in ("1", "true", "yes"))
 
     @staticmethod
     def _tensor_to_bytes(t: torch.Tensor) -> bytes:
@@ -71,12 +77,23 @@ class SpectraCompressor:
         w_groups = w_chunk.reshape(N_c, K // group_size, group_size).float()
         w_min = w_groups.amin(dim=-1, keepdim=True)
         w_max = w_groups.amax(dim=-1, keepdim=True)
+        diff = w_max - w_min
+        is_constant = (diff < 1e-8)
 
-        scales = (w_max - w_min) / 15.0
+        scales = torch.where(is_constant, torch.where(w_min == 0, torch.ones_like(w_min), torch.abs(w_min)), diff / 15.0)
         scales = torch.clamp(scales, min=1e-8)
-        zeros = torch.clamp(torch.round(-w_min / scales), 0, 15).to(torch.uint8)
 
-        q_w = torch.clamp(torch.round((w_groups - (-zeros.float() * scales)) / scales), 0, 15).to(torch.uint8)
+        zeros = torch.where(
+            is_constant,
+            torch.where(w_min < 0, torch.ones_like(w_min, dtype=torch.uint8), torch.zeros_like(w_min, dtype=torch.uint8)),
+            torch.clamp(torch.round(-w_min / scales), 0, 15).to(torch.uint8)
+        )
+
+        q_w = torch.where(
+            is_constant,
+            torch.where(w_min > 0, torch.ones_like(w_groups, dtype=torch.uint8), torch.zeros_like(w_groups, dtype=torch.uint8)),
+            torch.clamp(torch.round((w_groups - (-zeros.float() * scales)) / scales), 0, 15).to(torch.uint8)
+        )
         q_w = q_w.reshape(N_c, K // group_size, 32)
 
         # Marlin Interleaved Packing: 0..15 in low nibbles, 16..31 in high nibbles
@@ -185,14 +202,12 @@ class SpectraCompressor:
         _, outlier_idx = torch.topk(col_saliency, k=num_outliers, largest=True)
         outlier_idx, _ = torch.sort(outlier_idx)
         outlier_idx_cpu = outlier_idx.to(torch.int32).cpu().contiguous()
-        target_outlier_dtype = w.dtype if w.dtype in (torch.bfloat16, torch.float16) else torch.float16
+        target_outlier_dtype = w.dtype
         outlier_w = w[:, outlier_idx_cpu.long()].to(target_outlier_dtype).contiguous()
 
         if N <= 4096:
             w_dense = w.clone()
             w_dense[:, outlier_idx_cpu.long()] = 0.0
-            if self.hadamard_incoherence and (K % self.group_size == 0):
-                w_dense = fast_walsh_hadamard_transform(w_dense.reshape(N, K // self.group_size, self.group_size)).reshape(N, K)
         else:
             w_dense = None
 
@@ -200,7 +215,7 @@ class SpectraCompressor:
         return w_dense, outlier_idx_cpu, outlier_w, ratio, kurtosis
 
     @staticmethod
-    def _stream_tensors(model_path: Path) -> Iterator[Tuple[str, torch.Tensor]]:
+    def _stream_tensors(model_path: Path, trust_remote_code: bool = False) -> Iterator[Tuple[str, torch.Tensor]]:
         """
         Universal Zero-RAM-Spike Tensor Streamer:
         Iterates over safetensors shards or pytorch bin files one tensor at a time.
@@ -250,7 +265,7 @@ class SpectraCompressor:
             torch_dtype=torch.float16,
             device_map="cpu",
             low_cpu_mem_usage=True,
-            trust_remote_code=True
+            trust_remote_code=trust_remote_code
         )
         for k, v in model.state_dict().items():
             yield k, v
@@ -395,7 +410,12 @@ class SpectraCompressor:
         print(f"[Compressor] Group Size: {self.group_size} | Outliers: {self.base_outlier_ratio * 100:.1f}%")
 
         # 1. Load Config
-        config = AutoConfig.from_pretrained(str(model_path), trust_remote_code=True)
+        try:
+            config = AutoConfig.from_pretrained(str(model_path), trust_remote_code=self.trust_remote_code)
+        except Exception as e:
+            if not self.trust_remote_code and "trust_remote_code" in str(e).lower():
+                print(f"[Compressor] Error: Model requires remote code execution. Pass trust_remote_code=True or set SPECTRA_TRUST_REMOTE_CODE=1.")
+            raise
         config_dict = config.to_dict()
 
         temp_file = output_path.with_suffix(".tmp")
@@ -438,7 +458,7 @@ class SpectraCompressor:
             f_out.write(MAGIC_HEADER)
             f_out.write(struct.pack("<QQ", 0, 0)) # Placeholder for manifest offset and length
 
-            for name, param in self._stream_tensors(model_path):
+            for name, param in self._stream_tensors(model_path, trust_remote_code=self.trust_remote_code):
                 idx += 1
                 shape = list(param.shape)
                 cur_offset = f_out.tell()
@@ -489,7 +509,7 @@ class SpectraCompressor:
                         "outlier_idx_len": len(oi_bytes),
                         "outlier_idx_dtype": "int32",
                         "outlier_w_len": len(ow_bytes),
-                        "outlier_w_dtype": "bfloat16" if outlier_w.dtype == torch.bfloat16 else "float16",
+                        "outlier_w_dtype": str(outlier_w.dtype).replace("torch.", ""),
                         "num_outliers": outlier_idx.numel(),
                         "outlier_ratio": round(actual_ratio, 4),
                         "kurtosis": round(kurtosis, 2),
@@ -503,18 +523,8 @@ class SpectraCompressor:
                         print(f"[{idx} tensors] Compressed {name} {shape} -> 4-bit Group-32 + HDSQ (Kurtosis: {kurtosis:.1f})")
 
                 else:
-                    if param.dtype in (torch.int64, torch.int32, torch.int16, torch.int8, torch.uint8, torch.bool):
-                        save_dtype = param.dtype
-                        dtype_str = str(param.dtype).replace("torch.", "")
-                    elif param.dtype == torch.bfloat16:
-                        save_dtype = torch.bfloat16
-                        dtype_str = "bfloat16"
-                    elif param.dtype == torch.float32:
-                        save_dtype = torch.float32 if "inv_freq" in name else torch.float16
-                        dtype_str = "float32" if save_dtype == torch.float32 else "float16"
-                    else:
-                        save_dtype = torch.float16
-                        dtype_str = "float16"
+                    save_dtype = param.dtype
+                    dtype_str = str(param.dtype).replace("torch.", "")
 
                     t_bytes = self._tensor_to_bytes(param.to(save_dtype))
                     f_out.write(t_bytes)
@@ -570,7 +580,7 @@ class SpectraCompressor:
                 tok_dir = output_path.parent / (output_path.stem + "_tokenizer")
                 tok_dir.mkdir(parents=True, exist_ok=True)
                 try:
-                    tokenizer = AutoTokenizer.from_pretrained(str(model_path), trust_remote_code=True)
+                    tokenizer = AutoTokenizer.from_pretrained(str(model_path), trust_remote_code=self.trust_remote_code)
                     tokenizer.save_pretrained(str(tok_dir))
                 except Exception:
                     pass
@@ -616,5 +626,10 @@ class SpectraCompressor:
         print(f"Compressed Size : {compressed_size / (1024**3):.3f} GB")
         print(f"Ratio           : {compression_ratio:.2f}x ({summary['vram_savings_pct']}% VRAM reduction)")
         print("=" * 80)
+
+        gc.collect()
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+            torch.cuda.synchronize()
 
         return summary

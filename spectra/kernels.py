@@ -241,15 +241,17 @@ def _batched_w4a16_gemm_kernel(
         high = ((packed_bytes >> 4) & 0x0F).to(tl.float32)
 
         offs_k_group = (k_start // 32) + tl.arange(0, BLOCK_K // 32)
-        ptr_s = scales_ptr + (offs_bn[None, :] * stride_sn + offs_k_group[:, None] * stride_sk)
-        ptr_z = zeros_ptr + (offs_bn[None, :] * stride_zn + offs_k_group[:, None] * stride_zk)
-        mask_sz = (offs_bn[None, :] < N) & (offs_k_group[:, None] < (K // 32))
+        ptr_s = scales_ptr + (offs_bn[:, None] * stride_sn + offs_k_group[None, :] * stride_sk)
+        ptr_z = zeros_ptr + (offs_bn[:, None] * stride_zn + offs_k_group[None, :] * stride_zk)
+        mask_sz = (offs_bn[:, None] < N) & (offs_k_group[None, :] < (K // 32))
 
         s_tile = tl.load(ptr_s, mask=mask_sz, other=1.0).to(tl.float32)
         z_tile = tl.load(ptr_z, mask=mask_sz, other=0.0).to(tl.float32)
 
-        s_exp = tl.reshape(s_tile[:, None, :] + tl.zeros((1, 16, 1), dtype=tl.float32), (BLOCK_K // 2, BLOCK_N))
-        z_exp = tl.reshape(z_tile[:, None, :] + tl.zeros((1, 16, 1), dtype=tl.float32), (BLOCK_K // 2, BLOCK_N))
+        s_exp_n = tl.reshape(s_tile[:, :, None] + tl.zeros((1, 1, 16), dtype=tl.float32), (BLOCK_N, BLOCK_K // 2))
+        z_exp_n = tl.reshape(z_tile[:, :, None] + tl.zeros((1, 1, 16), dtype=tl.float32), (BLOCK_N, BLOCK_K // 2))
+        s_exp = tl.trans(s_exp_n)
+        z_exp = tl.trans(z_exp_n)
 
         if IS_BF16:
             w_low = ((low - z_exp) * s_exp).to(tl.bfloat16)

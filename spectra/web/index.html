@@ -1125,7 +1125,7 @@
         const res = await fetch('/api/engine/load', {
           method: 'POST',
           headers: {'Content-Type': 'application/json'},
-          body: JSON.stringify({ trdc_path: trdcPath })
+          body: JSON.stringify({ trdc_path: trdcPath, trust_remote_code: true })
         });
         const data = await res.json();
         if (data.status === 'success') {
@@ -1133,7 +1133,7 @@
           await updateTelemetry();
           alert(`Model ${data.model} successfully loaded in ${data.load_time_sec}s!`);
         } else {
-          alert('Failed to load: ' + JSON.stringify(data));
+          alert('Failed to load: ' + (data.detail || JSON.stringify(data)));
         }
       } catch (e) {
         alert('Error loading model: ' + e);
